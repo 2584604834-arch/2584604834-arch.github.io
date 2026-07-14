@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>“灾擎”多源感知接入平台（广西）</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      font-family: "Microsoft YaHei","PingFang SC",sans-serif;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(34,211,238,.08), transparent 22%),
+        radial-gradient(circle at 85% 16%, rgba(16,185,129,.07), transparent 24%),
+        linear-gradient(180deg,#07101d 0%,#0a1425 55%,#091321 100%);
+      color: #EAFBFF;
+    }
+    :root{
+      --panel: rgba(12,20,36,.82);
+      --panel2: rgba(18,28,48,.88);
+      --line: rgba(34,211,238,.18);
+      --cyan: #22D3EE;
+      --cyan2: #67E8F9;
+      --green: #10B981;
+      --yellow: #FACC15;
+      --orange: #F97316;
+      --red: #EF4444;
+      --blue: #3B82F6;
+      --text: #EAFBFF;
+      --sub: #9EC3D8;
+      --shadow: 0 12px 34px rgba(0,0,0,.35);
+    }
+    body::before{
+      content:""; position: fixed; inset: 0; pointer-events: none;
+      background:
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: 34px 34px,34px 34px;
+      opacity:.3;
+    }
+
+    .screen{
+      width:100vw; height:100vh; padding:12px;
+      display:grid;
+      grid-template-columns: 26% 48% 26%;
+      grid-template-rows: 78px 1fr 190px;
+      gap:12px;
+    }
+
+    .panel{
+      position: relative;
+      min-width:0; min-height:0;
+      background: var(--panel);
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(10px);
+    }
+    .panel::before{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background: linear-gradient(180deg, rgba(34,211,238,.04), transparent 26%);
+    }
+    .panel-header{
+      height:44px; padding:0 14px;
+      display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,.05);
+      position:relative; z-index:2;
+    }
+    .panel-title{
+      display:flex; align-items:center; gap:8px;
+      font-size:16px; font-weight:800; color:#F5FCFF; white-space:nowrap;
+    }
+    .panel-title::before{
+      content:""; width:5px; height:16px; border-radius:6px;
+      background: linear-gradient(180deg,var(--cyan2),var(--cyan));
+      box-shadow: 0 0 12px rgba(34,211,238,.45);
+    }
+    .panel-sub{ font-size:12px; color:var(--sub); white-space:nowrap; }
+    .panel-body{
+      height: calc(100% - 44px);
+      padding:12px; position:relative; z-index:2; min-height:0;
+    }
+
+    /* 顶部 */
+    .header{
+      grid-column:1 / 4;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:12px;
+    }
+    .title-box{
+      display:flex; align-items:center; padding:0 18px;
+      background: linear-gradient(90deg, rgba(16,28,48,.92), rgba(8,16,30,.98));
+    }
+    .title-box h1{
+      font-size:30px; font-weight:900; letter-spacing:1px; color:#F4FCFF; margin-bottom:4px;
+    }
+    .title-box p{ font-size:12px; color:var(--sub); }
+
+    .head-stats{
+      display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:10px;
+      background: linear-gradient(180deg, rgba(18,28,48,.92), rgba(8,16,30,.98));
+    }
+    .stat{
+      border-radius:14px; border:1px solid rgba(34,211,238,.12);
+      background: rgba(255,255,255,.03);
+      display:flex; flex-direction:column; justify-content:center; align-items:center;
+    }
+    .stat .k{ font-size:11px; color:var(--sub); margin-bottom:5px; }
+    .stat .v{ font-size:24px; font-weight:900; color:#fff; }
+
+    /* 左栏 */
+    .left-col{ grid-column:1; grid-row:2; display:grid; grid-template-rows: 54% 46%; gap:12px; min-height:0; }
+
+    .intro-box{
+      border-radius:16px; padding:14px; margin-bottom:12px;
+      border:1px solid rgba(34,211,238,.14);
+      background: linear-gradient(180deg, rgba(34,211,238,.08), rgba(255,255,255,.02));
+    }
+    .intro-box h3{ font-size:17px; font-weight:900; margin-bottom:8px; }
+    .intro-box p{ font-size:12px; line-height:1.8; color:#A8CCDA; }
+
+    .source-grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    }
+    .source-card{
+      border-radius:15px; padding:12px;
+      border:1px solid rgba(34,211,238,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+      position:relative;
+    }
+    .source-icon{
+      width:40px; height:40px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:21px; margin-bottom:8px;
+      background: rgba(34,211,238,.10);
+      border:1px solid rgba(34,211,238,.16);
+    }
+    .source-name{ font-size:15px; font-weight:800; margin-bottom:6px; }
+    .source-desc{ font-size:12px; line-height:1.65; color:#A8CCDA; min-height:48px; }
+    .source-meta{
+      margin-top:8px; display:flex; justify-content:space-between; gap:8px;
+      font-size:11px; color:#D9FBFF;
+    }
+    .source-meta span{
+      padding:3px 8px; border-radius:999px;
+      background: rgba(255,255,255,.04); border:1px solid rgba(34,211,238,.12);
+      white-space:nowrap;
+    }
+
+    .focus-grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px; height:100%;
+    }
+    .focus-card{
+      border-radius:16px; padding:12px;
+      border:1px solid rgba(34,211,238,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+    }
+    .focus-top{
+      display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+    }
+    .focus-name{ font-size:15px; font-weight:800; }
+    .focus-tag{
+      font-size:11px; padding:4px 8px; border-radius:999px;
+      border:1px solid rgba(34,211,238,.14); color:#DDF8FF;
+      background: rgba(34,211,238,.08);
+    }
+    .focus-list{ list-style:none; margin-top:6px; }
+    .focus-list li{
+      font-size:12px; color:#A7CBDA; line-height:1.8; padding-left:14px; position:relative;
+    }
+    .focus-list li::before{
+      content:""; width:5px; height:5px; border-radius:50%;
+      background: var(--cyan); position:absolute; left:0; top:9px;
+    }
+
+    /* 中间地图 */
+    .center-panel{ grid-column:2; grid-row:2; }
+    .map-wrap{
+      position:relative; width:100%; height:100%;
+      border-radius:16px; overflow:hidden;
+      background:
+        radial-gradient(circle at 48% 40%, rgba(16,185,129,.08), transparent 28%),
+        linear-gradient(180deg,#0a1424 0%,#0a1728 100%);
+    }
+    .map-bg{
+      position:absolute; inset:0;
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 32px 32px,32px 32px;
+    }
+    .terrain-shadow{
+      position:absolute; inset:0; z-index:1;
+      background:
+        radial-gradient(circle at 32% 30%, rgba(110,170,120,.10), transparent 18%),
+        radial-gradient(circle at 58% 34%, rgba(128,176,102,.08), transparent 16%),
+        radial-gradient(circle at 42% 60%, rgba(96,132,84,.08), transparent 15%),
+        radial-gradient(circle at 66% 65%, rgba(80,122,76,.07), transparent 17%);
+      mix-blend-mode:screen;
+    }
+    .map-wrap svg{ position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+    .map-label{
+      position:absolute; top:14px; left:50%; transform:translateX(-50%);
+      z-index:5; padding:8px 18px; border-radius:999px;
+      background: rgba(8,16,30,.76); border:1px solid rgba(34,211,238,.18);
+      font-size:15px; font-weight:800;
+    }
+
+    .legend{
+      position:absolute; left:14px; bottom:14px; z-index:6;
+      display:flex; flex-wrap:wrap; gap:8px; max-width:72%;
+    }
+    .legend .lg{
+      padding:5px 10px; border-radius:999px;
+      font-size:11px; color:#E7FBFF;
+      background: rgba(10,18,32,.76);
+      border:1px solid rgba(34,211,238,.14);
+      display:flex; align-items:center; gap:6px;
+    }
+    .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .blue{ background:#3B82F6; }
+    .yellow{ background:#FACC15; }
+    .orange{ background:#F97316; }
+    .red{ background:#EF4444; }
+
+    .hazard-icon{
+      position:absolute; width:24px; height:24px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      color:#fff; font-size:13px; font-weight:900;
+      border:2px solid rgba(255,255,255,.78);
+      z-index:6; cursor:pointer;
+      box-shadow:0 0 14px rgba(0,0,0,.28);
+      transition: transform .2s ease;
+    }
+    .hazard-icon:hover{ transform: scale(1.1); }
+    .hazard-icon::after{
+      content:""; position:absolute; inset:-8px; border-radius:50%;
+      border:1px solid rgba(255,255,255,.16); animation:pulse 2.6s infinite;
+    }
+    @keyframes pulse{
+      0%{ transform:scale(.7); opacity:.7; }
+      100%{ transform:scale(1.4); opacity:0; }
+    }
+    .haz-blue{ background: var(--blue); }
+    .haz-yellow{ background: var(--yellow); color:#202020; }
+    .haz-orange{ background: var(--orange); }
+    .haz-red{ background: var(--red); }
+
+    .node-tag{
+      position:absolute; z-index:6; transform:translate(12px,-8px);
+      padding:4px 8px; border-radius:10px;
+      background: rgba(10,18,32,.82);
+      border:1px solid rgba(34,211,238,.14);
+      font-size:11px; font-weight:700; white-space:nowrap;
+    }
+
+    .focus-mark{
+      position:absolute; z-index:5;
+      padding:5px 10px; border-radius:999px;
+      font-size:11px; font-weight:700;
+      color:#FFF7E6;
+      background: rgba(249,115,22,.14);
+      border:1px solid rgba(249,115,22,.28);
+      box-shadow:0 0 12px rgba(249,115,22,.15);
+      white-space:nowrap;
+    }
+
+    .preview-card{
+      position:absolute; right:14px; top:58px; width:270px;
+      border-radius:16px; border:1px solid rgba(34,211,238,.18);
+      background: rgba(10,18,32,.92);
+      backdrop-filter: blur(10px);
+      box-shadow:0 12px 28px rgba(0,0,0,.36);
+      padding:14px; z-index:8; display:none;
+    }
+    .preview-card.show{ display:block; }
+    .preview-title{ font-size:15px; font-weight:900; margin-bottom:8px; }
+    .preview-row{
+      display:flex; justify-content:space-between; gap:10px;
+      margin-bottom:8px; font-size:12px;
+    }
+    .preview-row span:first-child{ color:#90B8CA; }
+    .preview-row span:last-child{ color:#EAFBFF; font-weight:700; text-align:right; }
+    .level-chip{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800;
+      border:1px solid rgba(255,255,255,.12);
+    }
+    .level-blue{ background:rgba(59,130,246,.18); color:#DDEBFF; border-color:rgba(59,130,246,.32);}
+    .level-yellow{ background:rgba(250,204,21,.18); color:#FFF8D5; border-color:rgba(250,204,21,.34);}
+    .level-orange{ background:rgba(249,115,22,.18); color:#FFE8D8; border-color:rgba(249,115,22,.34);}
+    .level-red{ background:rgba(239,68,68,.18); color:#FFE5E5; border-color:rgba(239,68,68,.34);}
+    .preview-desc{ margin-top:8px; font-size:12px; line-height:1.75; color:#A7CBDA; }
+
+    /* 右栏 */
+    .right-col{ grid-column:3; grid-row:2; display:grid; grid-template-rows: 42% 58%; gap:12px; min-height:0; }
+
+    .overview-grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    }
+    .ov-card{
+      border-radius:15px; padding:12px;
+      border:1px solid rgba(34,211,238,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+    }
+    .ov-k{ font-size:12px; color:var(--sub); margin-bottom:8px; }
+    .ov-v{ font-size:23px; font-weight:900; margin-bottom:4px; }
+    .ov-d{ font-size:12px; color:#A8CCDA; line-height:1.7; }
+
+    .scroll-monitor{
+      height:100%; overflow:hidden; position:relative;
+    }
+    .monitor-track{
+      display:flex; gap:12px; overflow-x:auto; overflow-y:hidden;
+      height:100%; padding-bottom:4px; scroll-behavior:smooth;
+    }
+    .monitor-track::-webkit-scrollbar{ height:8px; }
+    .monitor-track::-webkit-scrollbar-thumb{
+      background: rgba(34,211,238,.24); border-radius:999px;
+    }
+    .cam-card{
+      flex:0 0 320px;
+      border-radius:16px; overflow:hidden;
+      border:1px solid rgba(34,211,238,.14);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+    }
+    .cam-head{
+      height:40px; padding:0 12px; display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid rgba(255,255,255,.05);
+      background: rgba(255,255,255,.02);
+    }
+    .cam-title{ font-size:13px; font-weight:800; white-space:nowrap; }
+    .cam-status{
+      font-size:11px; padding:3px 8px; border-radius:999px;
+      color:#DFFCF2; background: rgba(16,185,129,.14); border:1px solid rgba(16,185,129,.24);
+    }
+    .cam-view{
+      height:160px; position:relative; overflow:hidden;
+      background:
+        linear-gradient(180deg, rgba(120,140,160,.18), rgba(20,30,40,.28)),
+        radial-gradient(circle at 50% 40%, rgba(255,255,255,.08), transparent 40%),
+        linear-gradient(180deg,#2f3f4d 0%, #263746 35%, #1d2935 100%);
+    }
+    .cam-scene-road,
+    .cam-scene-river,
+    .cam-scene-slope{
+      position:absolute; inset:0;
+    }
+    .cam-scene-road::before{
+      content:""; position:absolute; left:42%; bottom:-10%; width:18%; height:120%;
+      background: linear-gradient(180deg, rgba(80,90,100,.15), rgba(36,40,44,.92));
+      transform: perspective(240px) rotateX(62deg);
+      border-left:2px solid rgba(255,255,255,.08);
+      border-right:2px solid rgba(255,255,255,.08);
+    }
+    .cam-scene-road::after{
+      content:""; position:absolute; left:49%; top:8%; width:2px; height:74%;
+      background: repeating-linear-gradient(180deg, #fff 0 8px, transparent 8px 16px);
+      opacity:.6;
+    }
+    .cam-scene-river::before{
+      content:""; position:absolute; left:16%; bottom:-8%; width:68%; height:62%;
+      background: linear-gradient(180deg, rgba(70,120,160,.25), rgba(24,68,120,.88));
+      border-radius: 52% 48% 40% 60% / 28% 34% 66% 72%;
+      transform: rotate(-7deg);
+      box-shadow: inset 0 0 30px rgba(255,255,255,.08);
+    }
+    .cam-scene-slope::before{
+      content:""; position:absolute; left:-10%; bottom:0; width:72%; height:70%;
+      background: linear-gradient(180deg, rgba(80,108,72,.2), rgba(58,84,48,.9));
+      clip-path: polygon(0 100%, 100% 14%, 100% 100%);
+    }
+    .cam-scene-slope::after{
+      content:""; position:absolute; right:-8%; bottom:0; width:56%; height:62%;
+      background: linear-gradient(180deg, rgba(76,96,68,.18), rgba(48,66,42,.88));
+      clip-path: polygon(0 28%, 100% 100%, 0 100%);
+    }
+    .scan-line{
+      position:absolute; left:0; width:100%; height:2px;
+      background: linear-gradient(90deg, transparent, rgba(34,211,238,.8), transparent);
+      animation: scan 3.2s linear infinite;
+      box-shadow:0 0 10px rgba(34,211,238,.55);
+    }
+    @keyframes scan{
+      0%{ top:8%; } 100%{ top:92%; }
+    }
+    .cam-overlay{
+      position:absolute; inset:0;
+      background:
+        linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+      background-size: 24px 24px,24px 24px;
+      opacity:.45;
+    }
+    .cam-badge{
+      position:absolute; left:10px; top:10px; z-index:2;
+      font-size:11px; font-weight:800;
+      padding:4px 8px; border-radius:999px;
+      background: rgba(8,16,30,.76);
+      border:1px solid rgba(34,211,238,.16);
+    }
+    .cam-alert{
+      position:absolute; right:10px; bottom:10px; z-index:2;
+      font-size:11px; font-weight:800;
+      padding:4px 8px; border-radius:999px;
+      background: rgba(239,68,68,.14);
+      border:1px solid rgba(239,68,68,.26);
+      color:#FFEDED;
+    }
+    .cam-foot{
+      padding:10px 12px 12px;
+    }
+    .cam-meta{
+      display:flex; justify-content:space-between; gap:8px;
+      font-size:11px; color:#DDF8FF; margin-bottom:6px;
+    }
+    .cam-desc{
+      font-size:12px; line-height:1.7; color:#A7CBDA;
+      height:40px; overflow:hidden;
+    }
+
+    /* 底部 */
+    .bottom{ grid-column:1 / 4; grid-row:3; }
+    .bottom-grid{
+      display:grid; grid-template-columns: repeat(5,1fr); gap:12px; height:100%;
+    }
+    .info-card{
+      border-radius:16px; border:1px solid rgba(34,211,238,.14);
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      padding:14px;
+      display:flex; flex-direction:column; justify-content:center;
+    }
+    .info-card .k{ font-size:12px; color:var(--sub); margin-bottom:8px; }
+    .info-card .v{ font-size:24px; font-weight:900; color:#fff; margin-bottom:6px; }
+    .info-card .d{ font-size:12px; line-height:1.7; color:#A7CBDA; }
+
+    @media (max-width: 1600px){
+      .screen{ grid-template-columns: 27% 46% 27%; grid-template-rows:74px 1fr 180px; gap:10px; padding:10px; }
+      .title-box h1{ font-size:26px; }
+      .stat .v,.ov-v,.info-card .v{ font-size:21px; }
+      .cam-card{ flex-basis:300px; }
+    }
+    @media (max-width: 1366px){
+      .screen{ grid-template-columns: 28% 44% 28%; grid-template-rows:68px 1fr 170px; gap:8px; padding:8px; }
+      .panel-header{ height:40px; }
+      .panel-body{ height: calc(100% - 40px); padding:10px; }
+      .title-box h1{ font-size:22px; }
+      .head-stats{ gap:8px; }
+      .cam-view{ height:145px; }
+      .cam-card{ flex-basis:280px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+
+    <!-- 顶部 -->
+    <div class="header">
+      <div class="panel title-box">
+        <div>
+          <h1>“灾擎”多源感知接入平台</h1>
+          <p>聚焦广西区域多源接入、重点领域感知、灾害总览联动、实时监控模拟展示</p>
+        </div>
+      </div>
+      <div class="panel head-stats">
+        <div class="stat">
+          <div class="k">在线设备</div>
+          <div class="v">128</div>
+        </div>
+        <div class="stat">
+          <div class="k">接入总量</div>
+          <div class="v">156</div>
+        </div>
+        <div class="stat">
+          <div class="k">今日告警</div>
+          <div class="v">23</div>
+        </div>
+        <div class="stat">
+          <div class="k">接入率</div>
+          <div class="v">82%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 左 -->
+    <div class="left-col">
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">接入源与能力说明</div>
+          <div class="panel-sub">保证简洁，同时信息足够完整</div>
+        </div>
+        <div class="panel-body">
+          <div class="intro-box">
+            <h3>平台接入真实业务链路</h3>
+            <p>
+              平台统一接入<strong style="color:#F3FCFF;">视频监控、物联网传感器、气象数据、无人机巡查</strong>四类核心来源，
+              形成“前端感知—平台接入—识别分析—预警联动”的业务闭环。
+              接入数据不只是展示，而是进一步用于<strong style="color:#67E8F9;">灾种识别、等级判定、趋势研判、处置支撑</strong>。
+            </p>
+          </div>
+
+          <div class="source-grid">
+            <div class="source-card">
+              <div class="source-icon">🎥</div>
+              <div class="source-name">视频监控</div>
+              <div class="source-desc">覆盖河道、道路边坡、城市易涝点、林区等关键区域，提供图像识别基础。</div>
+              <div class="source-meta">
+                <span>在线 56 路</span><span>秒级回传</span>
+              </div>
+            </div>
+            <div class="source-card">
+              <div class="source-icon">📡</div>
+              <div class="source-name">传感器设备</div>
+              <div class="source-desc">采集雨量、水位、位移、烟感、温湿度、风速等连续数据，支持阈值触发。</div>
+              <div class="source-meta">
+                <span>在线 48 台</span><span>实时上报</span>
+              </div>
+            </div>
+            <div class="source-card">
+              <div class="source-icon">☁️</div>
+              <div class="source-name">气象数据</div>
+              <div class="source-desc">接入降雨预报、雷达回波、预警信息等，支撑山洪、内涝、滑坡趋势预判。</div>
+              <div class="source-meta">
+                <span>5 类接口</span><span>分钟级更新</span>
+              </div>
+            </div>
+            <div class="source-card">
+              <div class="source-icon">🚁</div>
+              <div class="source-name">无人机巡查</div>
+              <div class="source-desc">用于重点区域补盲、应急飞行和灾后复核，实现机动化快速巡查。</div>
+              <div class="source-meta">
+                <span>任务 12 次</span><span>移动补盲</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">重点领域单独标注</div>
+          <div class="panel-sub">便于汇报时直观说明重点防控对象</div>
+        </div>
+        <div class="panel-body">
+          <div class="focus-grid">
+            <div class="focus-card">
+              <div class="focus-top">
+                <div class="focus-name">地质灾害点</div>
+                <div class="focus-tag">重点领域</div>
+              </div>
+              <ul class="focus-list">
+                <li>山区边坡、切坡建房点位</li>
+                <li>落石滑坡历史隐患区</li>
+                <li>强降雨后需加强巡查复核</li>
+              </ul>
+            </div>
+            <div class="focus-card">
+              <div class="focus-top">
+                <div class="focus-name">江河库坝</div>
+                <div class="focus-tag">重点领域</div>
+              </div>
+              <ul class="focus-list">
+                <li>河道水位、漫堤风险监测</li>
+                <li>中小水库运行状态关注</li>
+                <li>与气象预报联动研判</li>
+              </ul>
+            </div>
+            <div class="focus-card">
+              <div class="focus-top">
+                <div class="focus-name">城市易涝区</div>
+                <div class="focus-tag">重点领域</div>
+              </div>
+              <ul class="focus-list">
+                <li>下穿通道、地下空间</li>
+                <li>低洼道路、易积水路段</li>
+                <li>暴雨期间快速告警处置</li>
+              </ul>
+            </div>
+            <div class="focus-card">
+              <div class="focus-top">
+                <div class="focus-name">林区与道路</div>
+                <div class="focus-tag">重点领域</div>
+              </div>
+              <ul class="focus-list">
+                <li>林火烟点与烟雾早发现</li>
+                <li>山路边坡落石动态监测</li>
+                <li>视频+巡查联合补盲</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 中 -->
+    <div class="panel center-panel">
+      <div class="panel-header">
+        <div class="panel-title">广西灾害总览图</div>
+        <div class="panel-sub">灾害标识与总览图结合，等级按红橙黄蓝标注</div>
+      </div>
+      <div class="panel-body">
+        <div class="map-wrap" id="mapWrap">
+          <div class="map-bg"></div>
+          <div class="terrain-shadow"></div>
+          <div class="map-label">广西重点区域灾害感知总览</div>
+
+          <svg viewBox="0 0 1000 700" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="gxFill" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="rgba(94,140,86,0.18)" />
+                <stop offset="45%" stop-color="rgba(86,122,78,0.12)" />
+                <stop offset="100%" stop-color="rgba(38,64,54,0.18)" />
+              </linearGradient>
+            </defs>
+            <path d="M214,120
+                     C290,86 372,104 420,138
+                     C470,172 522,152 592,126
+                     C684,92 770,130 824,186
+                     C880,244 914,314 902,396
+                     C888,492 822,566 730,594
+                     C648,620 566,596 494,560
+                     C442,534 398,540 330,572
+                     C252,608 176,582 126,516
+                     C88,464 72,400 76,334
+                     C80,268 120,214 168,172
+                     C184,158 196,132 214,120Z"
+                  fill="url(#gxFill)"
+                  stroke="rgba(34,211,238,.34)"
+                  stroke-width="2.2"
+                  stroke-dasharray="8 7"/>
+            <path d="M252,210 C336,180 412,236 490,212 C566,190 620,150 718,190 C794,220 846,292 836,362 C828,430 786,492 692,512 C604,530 542,516 468,550 C392,586 284,570 226,516 C170,464 148,390 174,318 C188,278 202,230 252,210Z"
+                  fill="none"
+                  stroke="rgba(255,255,255,.08)"
+                  stroke-width="1.6"/>
+            <path d="M260,212 L322,248 L402,236 L480,278 L590,250 L674,288 L760,254"
+                  fill="none"
+                  stroke="rgba(34,211,238,.14)"
+                  stroke-width="2"/>
+            <path d="M228,458 L324,426 L420,452 L534,426 L652,462 L760,430"
+                  fill="none"
+                  stroke="rgba(34,211,238,.12)"
+                  stroke-width="2"/>
+          </svg>
+
+          <!-- 重点领域标注 -->
+          <div class="focus-mark" style="left:24%; top:24%;">重点领域：地质灾害带</div>
+          <div class="focus-mark" style="left:55%; top:46%;">重点领域：城市易涝区</div>
+          <div class="focus-mark" style="left:60%; top:22%;">重点领域：林区巡查区</div>
+          <div class="focus-mark" style="left:62%; top:58%;">重点领域：江河水文监测区</div>
+
+          <div class="preview-card" id="previewCard">
+            <div class="preview-title" id="previewTitle">点位信息</div>
+            <div class="preview-row">
+              <span>灾种</span><span id="previewType">-</span>
+            </div>
+            <div class="preview-row">
+              <span>灾害等级</span><span id="previewLevelWrap">-</span>
+            </div>
+            <div class="preview-row">
+              <span>所在区域</span><span id="previewArea">-</span>
+            </div>
+            <div class="preview-row">
+              <span>重点领域</span><span id="previewDomain">-</span>
+            </div>
+            <div class="preview-row">
+              <span>监测状态</span><span id="previewStatus">在线</span>
+            </div>
+            <div class="preview-desc" id="previewDesc">当前点位信息说明。</div>
+          </div>
+
+          <div class="legend">
+            <div class="lg"><span class="dot red"></span>红色：特别严重/高风险</div>
+            <div class="lg"><span class="dot orange"></span>橙色：严重/较高风险</div>
+            <div class="lg"><span class="dot yellow"></span>黄色：较重/中风险</div>
+            <div class="lg"><span class="dot blue"></span>蓝色：一般/关注级</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右 -->
+    <div class="right-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">监测概况</div>
+          <div class="panel-sub">突出真实性和内容密度</div>
+        </div>
+        <div class="panel-body">
+          <div class="overview-grid">
+            <div class="ov-card">
+              <div class="ov-k">覆盖灾种</div>
+              <div class="ov-v">6 类</div>
+              <div class="ov-d">山洪、滑坡、落石、城市内涝、河道水位、林火烟雾。</div>
+            </div>
+            <div class="ov-card">
+              <div class="ov-k">重点区域</div>
+              <div class="ov-v">14 处</div>
+              <div class="ov-d">按山区、河道、水库、林区、城区易涝点进行分区管控。</div>
+            </div>
+            <div class="ov-card">
+              <div class="ov-k">实时告警</div>
+              <div class="ov-v">23 条</div>
+              <div class="ov-d">其中红色 2 条、橙色 5 条、黄色 8 条、蓝色 8 条。</div>
+            </div>
+            <div class="ov-card">
+              <div class="ov-k">联动处置</div>
+              <div class="ov-v">闭环</div>
+              <div class="ov-d">支持自动识别、人工复核、预警推送与巡查反馈闭环管理。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">实时监控模拟</div>
+          <div class="panel-sub">模块内可左右滑动，不与其他版块挤压</div>
+        </div>
+        <div class="panel-body">
+          <div class="scroll-monitor">
+            <div class="monitor-track" id="monitorTrack">
+
+              <div class="cam-card">
+                <div class="cam-head">
+                  <div class="cam-title">南宁·城市易涝点视频</div>
+                  <div class="cam-status">在线</div>
+                </div>
+                <div class="cam-view">
+                  <div class="cam-scene-road"></div>
+                  <div class="cam-overlay"></div>
+                  <div class="scan-line"></div>
+                  <div class="cam-badge">实时画面</div>
+                  <div class="cam-alert">黄色预警</div>
+                </div>
+                <div class="cam-foot">
+                  <div class="cam-meta"><span>灾种：城市内涝</span><span>更新时间：09:42</span></div>
+                  <div class="cam-desc">模拟道路低洼点监控场景，重点关注积水扩散范围与交通通行状态。</div>
+                </div>
+              </div>
+
+              <div class="cam-card">
+                <div class="cam-head">
+                  <div class="cam-title">桂林·山区边坡监测</div>
+                  <div class="cam-status">在线</div>
+                </div>
+                <div class="cam-view">
+                  <div class="cam-scene-slope"></div>
+                  <div class="cam-overlay"></div>
+                  <div class="scan-line" style="animation-duration:3.6s;"></div>
+                  <div class="cam-badge">AI识别中</div>
+                  <div class="cam-alert">橙色预警</div>
+                </div>
+                <div class="cam-foot">
+                  <div class="cam-meta"><span>灾种：滑坡/落石</span><span>更新时间：09:45</span></div>
+                  <div class="cam-desc">模拟山体边坡视频场景，用于识别岩土松动、边坡变形和滚石风险。</div>
+                </div>
+              </div>
+
+              <div class="cam-card">
+                <div class="cam-head">
+                  <div class="cam-title">贵港·河道水文监控</div>
+                  <div class="cam-status">在线</div>
+                </div>
+                <div class="cam-view">
+                  <div class="cam-scene-river"></div>
+                  <div class="cam-overlay"></div>
+                  <div class="scan-line" style="animation-duration:2.8s;"></div>
+                  <div class="cam-badge">实时画面</div>
+                  <div class="cam-alert">蓝色预警</div>
+                </div>
+                <div class="cam-foot">
+                  <div class="cam-meta"><span>灾种：河道水位</span><span>更新时间：09:41</span></div>
+                  <div class="cam-desc">模拟河道断面与岸坡监控画面，用于辅助判断涨水趋势和漫堤隐患。</div>
+                </div>
+              </div>
+
+              <div class="cam-card">
+                <div class="cam-head">
+                  <div class="cam-title">贺州·林区烟雾巡检</div>
+                  <div class="cam-status">在线</div>
+                </div>
+                <div class="cam-view">
+                  <div class="cam-scene-slope"></div>
+                  <div class="cam-overlay"></div>
+                  <div class="scan-line" style="animation-duration:4.2s;"></div>
+                  <div class="cam-badge">无人机回传</div>
+                  <div class="cam-alert">蓝色预警</div>
+                </div>
+                <div class="cam-foot">
+                  <div class="cam-meta"><span>灾种：林火烟雾</span><span>更新时间：09:39</span></div>
+                  <div class="cam-desc">模拟林区巡检画面，用于早期烟点发现与固定监控盲区补充覆盖。</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部 -->
+    <div class="panel bottom">
+      <div class="panel-header">
+        <div class="panel-title">平台摘要</div>
+        <div class="panel-sub">增强内容丰富性，同时确保版块清晰不拥挤</div>
+      </div>
+      <div class="panel-body">
+        <div class="bottom-grid">
+          <div class="info-card">
+            <div class="k">统一接入</div>
+            <div class="v">4 类源</div>
+            <div class="d">统一纳管视频、传感器、气象、无人机等核心感知来源。</div>
+          </div>
+          <div class="info-card">
+            <div class="k">重点领域</div>
+            <div class="v">4 大类</div>
+            <div class="d">聚焦地灾点、江河库坝、城市易涝区、林区道路等重点对象。</div>
+          </div>
+          <div class="info-card">
+            <div class="k">等级标识</div>
+            <div class="v">4 级</div>
+            <div class="d">采用红橙黄蓝统一标识风险等级，地图总览与预警信息同步表达。</div>
+          </div>
+          <div class="info-card">
+            <div class="k">实时感知</div>
+            <div class="v">连续</div>
+            <div class="d">图像与监测数据持续回传，支持多点联动观察与异常触发告警。</div>
+          </div>
+          <div class="info-card">
+            <div class="k">预警处置</div>
+            <div class="v">闭环管理</div>
+            <div class="d">从发现、研判、告警、派单到反馈，支撑完整业务闭环。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const mapWrap = document.getElementById('mapWrap');
+    const previewCard = document.getElementById('previewCard');
+    const previewTitle = document.getElementById('previewTitle');
+    const previewType = document.getElementById('previewType');
+    const previewLevelWrap = document.getElementById('previewLevelWrap');
+    const previewArea = document.getElementById('previewArea');
+    const previewDomain = document.getElementById('previewDomain');
+    const previewStatus = document.getElementById('previewStatus');
+    const previewDesc = document.getElementById('previewDesc');
+
+    const points = [
+      {
+        x: 31, y: 25, name: '桂林北部监测点',
+        icon: '⛰',
+        type: '山体滑坡',
+        level: 'orange',
+        levelText: '橙色',
+        area: '桂北山区',
+        domain: '地质灾害点',
+        status: '在线',
+        desc: '连续降雨后边坡含水率上升，存在局部滑坡风险，建议加强人工巡查与视频复核。'
+      },
+      {
+        x: 44, y: 29, name: '柳州沿河重点点位',
+        icon: '🌊',
+        type: '洪涝积水',
+        level: 'yellow',
+        levelText: '黄色',
+        area: '沿河城区',
+        domain: '城市易涝区',
+        status: '在线',
+        desc: '短时强降雨可能造成低洼区域积水，需持续关注排水设施与道路通行情况。'
+      },
+      {
+        x: 58, y: 23, name: '贺州林区巡查点',
+        icon: '🔥',
+        type: '林火烟雾',
+        level: 'blue',
+        levelText: '蓝色',
+        area: '林区防火带',
+        domain: '林区与道路',
+        status: '在线',
+        desc: '当前整体平稳，主要用于烟点早发现、早处置以及无人机补盲巡查。'
+      },
+      {
+        x: 51, y: 42, name: '南宁城区监测站',
+        icon: '🏙',
+        type: '城市内涝',
+        level: 'yellow',
+        levelText: '黄色',
+        area: '城区低洼点',
+        domain: '城市易涝区',
+        status: '在线',
+        desc: '暴雨期间需重点关注下穿通道、低洼路段和地下空间积水风险。'
+      },
+      {
+        x: 39, y: 46, name: '来宾地灾风险点',
+        icon: '🪨',
+        type: '边坡落石',
+        level: 'orange',
+        levelText: '橙色',
+        area: '丘陵道路沿线',
+        domain: '地质灾害点',
+        status: '在线',
+        desc: '道路边坡存在局部松动迹象，适合采用视频监控与现场巡查联合核验。'
+      },
+      {
+        x: 63, y: 50, name: '贵港水文监测站',
+        icon: '💧',
+        type: '河道水位',
+        level: 'blue',
+        levelText: '蓝色',
+        area: '河道监测区',
+        domain: '江河库坝',
+        status: '在线',
+        desc: '当前水位呈缓慢上涨趋势，建议结合上游降雨和气象预报开展趋势判读。'
+      },
+      {
+        x: 48, y: 58, name: '崇左山洪监测点',
+        icon: '⚠',
+        type: '山洪风险',
+        level: 'red',
+        levelText: '红色',
+        area: '山洪沟谷区',
+        domain: '江河库坝',
+        status: '在线',
+        desc: '强降雨叠加地形汇流影响，山洪风险较高，应强化预警值守和转移准备。'
+      },
+      {
+        x: 71, y: 60, name: '玉林道路巡检点',
+        icon: '🚧',
+        type: '地表积水',
+        level: 'blue',
+        levelText: '蓝色',
+        area: '城郊结合部',
+        domain: '林区与道路',
+        status: '在线',
+        desc: '当前未发现明显异常，主要承担区域动态巡查与补盲监测任务。'
+      }
+    ];
+
+    function getColorClass(level){
+      if(level === 'red') return 'haz-red';
+      if(level === 'orange') return 'haz-orange';
+      if(level === 'yellow') return 'haz-yellow';
+      return 'haz-blue';
+    }
+
+    function getLevelChip(level, text){
+      if(level === 'red') return `<span class="level-chip level-red"><span class="dot red"></span>${text}</span>`;
+      if(level === 'orange') return `<span class="level-chip level-orange"><span class="dot orange"></span>${text}</span>`;
+      if(level === 'yellow') return `<span class="level-chip level-yellow"><span class="dot yellow"></span>${text}</span>`;
+      return `<span class="level-chip level-blue"><span class="dot blue"></span>${text}</span>`;
+    }
+
+    points.forEach(p => {
+      const node = document.createElement('div');
+      node.className = `hazard-icon ${getColorClass(p.level)}`;
+      node.style.left = p.x + '%';
+      node.style.top = p.y + '%';
+      node.textContent = p.icon;
+
+      const tag = document.createElement('div');
+      tag.className = 'node-tag';
+      tag.style.left = p.x + '%';
+      tag.style.top = p.y + '%';
+      tag.textContent = p.name;
+
+      function showPreview(){
+        previewCard.classList.add('show');
+        previewTitle.textContent = p.name;
+        previewType.textContent = p.type;
+        previewLevelWrap.innerHTML = getLevelChip(p.level, p.levelText);
+        previewArea.textContent = p.area;
+        previewDomain.textContent = p.domain;
+        previewStatus.textContent = p.status;
+        previewDesc.textContent = p.desc;
+      }
+      function hidePreview(){
+        previewCard.classList.remove('show');
+      }
+
+      node.addEventListener('mouseenter', showPreview);
+      node.addEventListener('mouseleave', hidePreview);
+      tag.addEventListener('mouseenter', showPreview);
+      tag.addEventListener('mouseleave', hidePreview);
+
+      mapWrap.appendChild(node);
+      mapWrap.appendChild(tag);
+    });
+
+    // 轻微自动滚动，可手动滑动
+    const track = document.getElementById('monitorTrack');
+    let autoScroll = 0;
+    let pause = false;
+
+    track.addEventListener('mouseenter', ()=> pause = true);
+    track.addEventListener('mouseleave', ()=> pause = false);
+
+    setInterval(() => {
+      if (pause) return;
+      autoScroll += 1;
+      if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 2) {
+        autoScroll = 0;
+      }
+      track.scrollLeft = autoScroll;
+    }, 40);
+  </script>
+</body>
+</html>

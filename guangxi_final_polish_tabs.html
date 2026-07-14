@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>广西壮族自治区自然灾害综合风险可视化平台 - 精修准交付版</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    :root{
+      --bg:#04101b;
+      --bg2:#07192a;
+      --panel:#081d31;
+      --panel-deep:#07182a;
+      --line:rgba(86,169,255,.18);
+      --line-strong:rgba(91,202,255,.38);
+      --text:#edf7ff;
+      --sub:#8cafcf;
+      --accent:#49d6ff;
+      --accent2:#71f2c0;
+      --shadow:0 16px 42px rgba(0,0,0,.35);
+
+      /* 风险等级色：红橙黄蓝 */
+      --risk-high:#ff4d5a;
+      --risk-mid-high:#ff9a2f;
+      --risk-mid:#ffd34f;
+      --risk-mid-low:#56b8ff;
+
+      /* 灾种色：与等级色区分 */
+      --haz-flood:#35c8ff;
+      --haz-geology:#67dd9a;
+      --haz-typhoon:#9a8cff;
+      --haz-drought:#d79a52;
+      --haz-fire:#ff5f96;
+      --haz-cold:#b8c7ff;
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      width:100%;
+      height:100%;
+      margin:0;
+      color:var(--text);
+      font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",Arial,sans-serif;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(54,136,255,.13), transparent 28%),
+        radial-gradient(circle at 85% 16%, rgba(73,214,255,.10), transparent 24%),
+        linear-gradient(180deg,#04101b 0%,#07192a 48%,#030b13 100%);
+      overflow:hidden;
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:
+        linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size:34px 34px;
+      opacity:.42;
+      pointer-events:none;
+    }
+
+    .app{
+      width:100%;
+      height:100vh;
+      padding:8px;
+      display:grid;
+      grid-template-rows:64px 1fr;
+      gap:8px;
+    }
+
+    .topbar{
+      position:relative;
+      overflow:hidden;
+      display:grid;
+      grid-template-columns:1fr auto;
+      align-items:center;
+      gap:12px;
+      background:linear-gradient(180deg, rgba(8,28,47,.98), rgba(6,19,34,.95));
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      padding:0 14px;
+    }
+
+    .topbar::before{
+      content:"";
+      position:absolute;
+      left:0; right:0; top:0;
+      height:2px;
+      background:linear-gradient(90deg, transparent, rgba(73,214,255,.95), transparent);
+    }
+
+    .header-title h1{
+      margin:0;
+      font-size:23px;
+      font-weight:900;
+      letter-spacing:.5px;
+      color:#eef8ff;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .header-title p{
+      margin:4px 0 0;
+      font-size:12px;
+      color:var(--sub);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .header-stats{
+      display:flex;
+      gap:10px;
+    }
+
+    .stat{
+      min-width:118px;
+      padding:10px 14px;
+      border-radius:14px;
+      background:linear-gradient(180deg, rgba(17,41,69,.95), rgba(11,28,49,.9));
+      border:1px solid rgba(255,255,255,.07);
+      text-align:center;
+    }
+
+    .stat .k{
+      font-size:12px;
+      color:#93b4d3;
+      margin-bottom:4px;
+    }
+
+    .stat .v{
+      font-size:16px;
+      font-weight:800;
+      color:#fff;
+    }
+
+    .main{
+      min-height:0;
+      display:grid;
+      grid-template-columns:286px 1fr 350px;
+      gap:8px;
+    }
+
+    .col{
+      min-height:0;
+      display:grid;
+      gap:8px;
+    }
+
+    .left{grid-template-rows: 0.78fr 0.92fr 1fr;}
+    .center{grid-template-rows: 1.18fr 0.94fr;}
+    .right{grid-template-rows: 1fr 0.96fr;}
+
+    .panel{
+      min-height:0;
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      background:linear-gradient(180deg, rgba(9,29,49,.96), rgba(6,20,35,.94));
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .panel::before{
+      content:"";
+      position:absolute;
+      left:0; right:0; top:0;
+      height:1px;
+      background:linear-gradient(90deg, transparent, rgba(73,214,255,.6), transparent);
+      opacity:.65;
+    }
+
+    .panel-header{
+      height:44px;
+      flex:0 0 44px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.022), rgba(255,255,255,.008));
+      border-bottom:1px solid rgba(255,255,255,.05);
+    }
+
+    .panel-title{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:15px;
+      font-weight:800;
+      color:#f4fbff;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .panel-title::before{
+      content:"";
+      width:5px;
+      height:18px;
+      border-radius:4px;
+      background:linear-gradient(180deg, #4ce3ff, #72f0c4);
+      box-shadow:0 0 10px rgba(76,227,255,.45);
+      flex:0 0 auto;
+    }
+
+    .panel-body{
+      flex:1;
+      min-height:0;
+      padding:10px;
+    }
+
+    .scroll{
+      height:100%;
+      overflow:auto;
+      padding-right:4px;
+    }
+
+    .scroll::-webkit-scrollbar{width:8px;height:8px}
+    .scroll::-webkit-scrollbar-thumb{
+      background:rgba(120,175,230,.42);
+      border-radius:20px;
+    }
+    .scroll::-webkit-scrollbar-track{
+      background:rgba(255,255,255,.03);
+      border-radius:20px;
+    }
+
+    /* 图例 */
+    .legend-compact{
+      display:grid;
+      gap:8px;
+    }
+
+    .legend-group{
+      border:1px solid rgba(255,255,255,.055);
+      background:linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.016));
+      border-radius:14px;
+      padding:10px;
+    }
+
+    .legend-group h3{
+      margin:0 0 8px;
+      font-size:12px;
+      color:#f3f9ff;
+      line-height:1.45;
+      font-weight:700;
+    }
+
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      color:#c5dbee;
+      margin:6px 0;
+      line-height:1.45;
+    }
+
+    .legend-swatch{
+      width:13px;
+      height:13px;
+      border-radius:4px;
+      flex:0 0 auto;
+    }
+
+    .dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      display:inline-block;
+      flex:0 0 auto;
+    }
+
+    .hazard-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);
+      font-size:11px;
+      color:#e8f5ff;
+      margin:2px 6px 4px 0;
+      white-space:nowrap;
+    }
+
+    .haz-ico{
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:11px;
+      font-weight:700;
+      color:#08131f;
+    }
+
+    .risk-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:11px;
+      color:#fff;
+      margin:0 4px 4px 0;
+      white-space:nowrap;
+    }
+
+    /* 推送 tabs */
+    .push-wrap{
+      display:grid;
+      grid-template-rows:auto auto 1fr;
+      gap:10px;
+      height:100%;
+    }
+
+    .push-top{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      align-items:center;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.06);
+      background:
+        linear-gradient(135deg, rgba(73,214,255,.13), rgba(113,242,192,.08)),
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    }
+
+    .push-top .title{
+      font-size:14px;
+      font-weight:800;
+      color:#f4fbff;
+    }
+
+    .push-top .sub{
+      font-size:12px;
+      color:#97b8d5;
+      margin-top:4px;
+      line-height:1.5;
+    }
+
+    .push-badge{
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:#eaffff;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(8,27,46,.65);
+      white-space:nowrap;
+    }
+
+    .push-tabs{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .push-tab{
+      border:none;
+      cursor:pointer;
+      padding:7px 12px;
+      border-radius:999px;
+      font-size:12px;
+      color:#c8def0;
+      background:rgba(255,255,255,.035);
+      border:1px solid rgba(255,255,255,.06);
+      transition:.18s ease;
+    }
+
+    .push-tab.active{
+      color:#fff;
+      background:linear-gradient(90deg, rgba(73,214,255,.18), rgba(113,242,192,.16));
+      border-color:rgba(73,214,255,.24);
+      box-shadow:0 6px 14px rgba(0,0,0,.16);
+    }
+
+    .push-panel{
+      display:none;
+      min-height:0;
+      overflow:auto;
+      gap:10px;
+      padding-right:2px;
+    }
+
+    .push-panel.active{
+      display:grid;
+    }
+
+    .push-item{
+      position:relative;
+      padding:12px 12px 12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.06);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      cursor:pointer;
+      transition:.18s ease;
+      overflow:hidden;
+    }
+
+    .push-item::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:4px;
+      border-radius:4px;
+      background:var(--push-color,#49d6ff);
+      box-shadow:0 0 12px rgba(255,255,255,.18);
+    }
+
+    .push-item:hover{
+      transform:translateY(-1px);
+      border-color:rgba(73,214,255,.22);
+      box-shadow:0 10px 20px rgba(0,0,0,.18);
+    }
+
+    .push-item.active{
+      border-color:rgba(113,242,192,.24);
+      background:
+        linear-gradient(135deg, rgba(73,214,255,.08), rgba(113,242,192,.06)),
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+    }
+
+    .push-meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:8px;
+    }
+
+    .push-level{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:12px;
+      font-weight:700;
+      color:#eef9ff;
+    }
+
+    .push-time{
+      font-size:11px;
+      color:#87a9c8;
+      white-space:nowrap;
+    }
+
+    .push-item h4{
+      margin:0 0 6px;
+      font-size:13px;
+      color:#f4fbff;
+      line-height:1.5;
+    }
+
+    .push-item p{
+      margin:0;
+      font-size:12px;
+      color:#9fc0db;
+      line-height:1.6;
+    }
+
+    .push-tags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:10px;
+    }
+
+    .push-tag{
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      color:#dff3ff;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.06);
+    }
+
+    /* 左下 */
+    .metrics{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px;
+      margin-bottom:10px;
+    }
+
+    .metric{
+      min-height:84px;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.055);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      transition:.18s ease;
+    }
+
+    .metric:hover{
+      transform:translateY(-1px);
+      border-color:rgba(73,214,255,.24);
+    }
+
+    .metric .k{font-size:12px;color:#90b0cf;margin-bottom:8px}
+    .metric .v{font-size:18px;font-weight:800;color:#fff;margin-bottom:4px}
+    .metric .d{font-size:12px;color:#74ddb4;line-height:1.45}
+
+    .mini-chart-card{
+      height:192px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.055);
+      background:linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.015));
+      padding:10px 10px 6px 10px;
+      overflow:hidden;
+    }
+
+    .mini-chart-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:2px;
+      padding:0 4px;
+      flex-wrap:wrap;
+    }
+
+    .mini-chart-title .t{
+      font-size:14px;
+      font-weight:700;
+      color:#eef7ff;
+      line-height:1.4;
+    }
+
+    .mini-chart-title .s{
+      font-size:12px;
+      color:#8fb2d2;
+    }
+
+    .mini-legend-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      padding:2px 4px 4px;
+    }
+
+    #riskMiniChart{
+      width:100%;
+      height:142px;
+    }
+
+    /* 中间地图 */
+    .map-main{
+      position:relative;
+      width:100%;
+      height:100%;
+      border-radius:14px;
+      overflow:hidden;
+      background:#071726;
+    }
+
+    #mainSatelliteMap{
+      width:100%;
+      height:100%;
+    }
+
+    .map-mask{
+      position:absolute;
+      inset:0;
+      z-index:350;
+      pointer-events:none;
+      background:
+        radial-gradient(circle at center, transparent 42%, rgba(3,10,18,.08) 62%, rgba(3,10,18,.22) 100%);
+    }
+
+    .map-overlay-box{
+      position:absolute;
+      z-index:500;
+      background:rgba(7,21,36,.72);
+      border:1px solid rgba(255,255,255,.09);
+      box-shadow:0 8px 24px rgba(0,0,0,.24);
+      backdrop-filter: blur(7px);
+      border-radius:12px;
+      color:#d7ebff;
+    }
+
+    .map-tools{
+      top:12px;
+      right:12px;
+      display:flex;
+      gap:8px;
+      padding:8px;
+    }
+
+    .tool-btn{
+      border:none;
+      background:rgba(8,26,46,.92);
+      color:#eef7ff;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:10px;
+      padding:8px 10px;
+      cursor:pointer;
+      font-size:12px;
+      transition:.18s ease;
+      white-space:nowrap;
+    }
+
+    .tool-btn:hover{
+      transform:translateY(-1px);
+      background:rgba(15,40,68,.98);
+    }
+
+    .main-map-legend{
+      left:12px;
+      bottom:12px;
+      width:372px;
+      max-width:47%;
+      padding:10px 12px;
+    }
+
+    .main-map-legend .h{
+      font-size:13px;
+      font-weight:700;
+      color:#f2f9ff;
+      margin-bottom:8px;
+    }
+
+    .hazard-list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px 10px;
+      margin-bottom:8px;
+    }
+
+    .hazard-item{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-size:12px;
+      color:#c6dcef;
+      white-space:nowrap;
+      padding:3px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.05);
+    }
+
+    .main-map-legend .p{
+      font-size:12px;
+      color:#9dbdd8;
+      line-height:1.65;
+    }
+
+    .floating-title{
+      position:absolute;
+      left:50%;
+      top:12px;
+      transform:translateX(-50%);
+      z-index:500;
+      pointer-events:none;
+      padding:8px 16px;
+      border-radius:999px;
+      background:rgba(7,20,34,.65);
+      border:1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(8px);
+      color:#eff8ff;
+      font-weight:700;
+      font-size:13px;
+      box-shadow:0 6px 16px rgba(0,0,0,.22);
+      white-space:nowrap;
+    }
+
+    .leaflet-tooltip.city-label{
+      background:rgba(7,20,35,.82);
+      border:1px solid rgba(255,255,255,.12);
+      color:#f6fbff;
+      border-radius:8px;
+      padding:3px 6px;
+      font-size:12px;
+      font-weight:700;
+      box-shadow:0 4px 14px rgba(0,0,0,.24);
+      white-space:nowrap;
+    }
+
+    .leaflet-tooltip.city-label:before{display:none;}
+
+    .leaflet-control-layers{
+      background:rgba(7,22,38,.88)!important;
+      color:#fff!important;
+      border:1px solid rgba(255,255,255,.08)!important;
+      border-radius:12px!important;
+      box-shadow:0 8px 24px rgba(0,0,0,.22);
+    }
+
+    .leaflet-control-layers label{color:#edf6ff!important;}
+
+    /* 右侧 */
+    .city-list{display:grid;gap:10px}
+
+    .city-row{
+      position:relative;
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+      align-items:center;
+      min-height:54px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.05);
+      background:linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      transition:.18s ease;
+    }
+
+    .city-row:hover{
+      transform:translateY(-1px);
+      border-color:rgba(73,214,255,.25);
+      box-shadow:0 8px 18px rgba(0,0,0,.18);
+      z-index:5;
+    }
+
+    .city-name{
+      font-size:14px;
+      color:#eef7ff;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .risk-tag{
+      padding:5px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:#fff;
+      white-space:nowrap;
+      font-weight:700;
+    }
+
+    .tag-high{background:linear-gradient(90deg,#ff5b66,#ff3c50)}
+    .tag-mid-high{background:linear-gradient(90deg,#ffb24a,#ff8d27)}
+    .tag-mid{background:linear-gradient(90deg,#ffe07a,#ffc846); color:#483300;}
+    .tag-mid-low{background:linear-gradient(90deg,#7cd3ff,#4ba8ff)}
+
+    .city-preview{
+      position:absolute;
+      left:12px;
+      right:12px;
+      top:100%;
+      margin-top:8px;
+      display:none;
+      z-index:20;
+      background:rgba(8,24,40,.97);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:10px;
+      color:#cfe4f7;
+      font-size:12px;
+      line-height:1.65;
+      box-shadow:0 10px 24px rgba(0,0,0,.28);
+    }
+
+    .city-row:hover .city-preview{display:block}
+
+    /* 数据库 */
+    .db-wrap{
+      height:100%;
+      display:grid;
+      grid-template-rows:auto 1fr;
+      gap:10px;
+    }
+
+    .db-banner{
+      padding:12px;
+      border-radius:14px;
+      background:
+        linear-gradient(135deg, rgba(73,214,255,.16), rgba(113,242,192,.1)),
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .db-banner h3{
+      margin:0 0 6px;
+      font-size:16px;
+      color:#f5fbff;
+      line-height:1.4;
+    }
+
+    .db-banner p{
+      margin:0;
+      font-size:12px;
+      color:#9fc0db;
+      line-height:1.65;
+    }
+
+    .db-grid{
+      min-height:0;
+      overflow:auto;
+      padding-right:4px;
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px;
+    }
+
+    .db-card{
+      min-height:118px;
+      border-radius:16px;
+      padding:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.06);
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      transition:.2s ease;
+      cursor:pointer;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .db-card::after{
+      content:"";
+      position:absolute;
+      right:-18px;
+      bottom:-18px;
+      width:74px;
+      height:74px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(73,214,255,.18), transparent 65%);
+    }
+
+    .db-card:hover{
+      transform:translateY(-2px);
+      border-color:rgba(73,214,255,.28);
+      box-shadow:0 10px 22px rgba(0,0,0,.2);
+    }
+
+    .db-card .icon{
+      width:36px;
+      height:36px;
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      background:linear-gradient(180deg, rgba(73,214,255,.18), rgba(113,242,192,.12));
+      border:1px solid rgba(255,255,255,.08);
+      color:#f1f9ff;
+      margin-bottom:10px;
+    }
+
+    .db-card .name{
+      font-size:14px;
+      font-weight:700;
+      color:#f2f9ff;
+      margin-bottom:4px;
+      line-height:1.45;
+    }
+
+    .db-card .desc{
+      font-size:12px;
+      color:#9bbbd7;
+      line-height:1.55;
+      flex:1;
+    }
+
+    .db-card .go{
+      margin-top:10px;
+      font-size:12px;
+      color:#74e2bc;
+    }
+
+    #trendChart{
+      width:100%;
+      height:100%;
+    }
+
+    @media (max-width:1450px){
+      .main{grid-template-columns:270px 1fr 330px}
+      .header-title h1{font-size:21px}
+    }
+
+    @media (max-width:1200px){
+      html,body{overflow:auto}
+      .app{height:auto}
+      .main{grid-template-columns:1fr}
+      .left,.center,.right{grid-template-rows:auto}
+      .panel{min-height:420px}
+      .main-map-legend{max-width:80%; width:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="header-title">
+        <h1>广西壮族自治区自然灾害综合风险可视化平台</h1>
+        <p>14地市精细化风险研判 · 卫星底图联动 · 智能推送增强版 · 纯前端准交付页面</p>
+      </div>
+      <div class="header-stats">
+        <div class="stat">
+          <div class="k">覆盖地市</div>
+          <div class="v">14</div>
+        </div>
+        <div class="stat">
+          <div class="k">重点监测县区</div>
+          <div class="v">111+</div>
+        </div>
+        <div class="stat">
+          <div class="k">当前主风险类型</div>
+          <div class="v">洪涝/地灾</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- 左 -->
+      <section class="col left">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">综合风险区划图例</div>
+          </div>
+          <div class="panel-body">
+            <div class="scroll">
+              <div class="legend-compact">
+                <div class="legend-group">
+                  <h3>风险等级统一标注</h3>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px 8px;">
+                    <span class="risk-chip" style="background:linear-gradient(90deg,#ff5b66,#ff3c50);">高风险 / 红</span>
+                    <span class="risk-chip" style="background:linear-gradient(90deg,#ffb24a,#ff8d27);">中高风险 / 橙</span>
+                    <span class="risk-chip" style="background:linear-gradient(90deg,#ffe07a,#ffc846);color:#4c3700;">中风险 / 黄</span>
+                    <span class="risk-chip" style="background:linear-gradient(90deg,#7cd3ff,#4ba8ff);">中低风险 / 蓝</span>
+                  </div>
+                </div>
+
+                <div class="legend-group">
+                  <h3>I 东北部洪涝 / 地质 / 森林火灾 / 低温冷冻</h3>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--risk-high)"></span>高风险区</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--risk-mid-high)"></span>中高风险区</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--risk-mid)"></span>中风险区</div>
+                  <div class="legend-item"><span class="legend-swatch" style="background:var(--risk-mid-low)"></span>中低风险区</div>
+                </div>
+
+                <div class="legend-group">
+                  <h3>灾害类型识别（与风险等级色分离）</h3>
+                  <div>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-flood)">≈</span>洪涝</span>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-geology)">▲</span>地质灾害</span>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-typhoon)">◎</span>台风</span>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-drought)">☼</span>干旱</span>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-fire)">✦</span>森林火灾</span>
+                    <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-cold)">❄</span>低温冷冻</span>
+                  </div>
+                </div>
+
+                <div class="legend-group">
+                  <h3>说明</h3>
+                  <div class="legend-item">风险等级使用“红橙黄蓝”统一体系；灾害类型采用独立图标色，避免混色误读。</div>
+                  <div class="legend-item">地图主图仅展示点位、标签与分类 识，不叠加中部形状块，阅读更清晰。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 推送tabs化 -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">智能风险推送</div>
+          </div>
+          <div class="panel-body">
+            <div class="push-wrap">
+              <div class="push-top">
+                <div>
+                  <div class="title">联动消息中心</div>
+                  <div class="sub">按风险推送、巡查任务、调度建议分栏展示，支持自动高亮与人工切换。</div>
+                </div>
+                <div class="push-badge" id="pushClock">--:--:--</div>
+              </div>
+
+              <div class="push-tabs">
+                <button class="push-tab active" data-tab="tab-risk">风险推送</button>
+                <button class="push-tab" data-tab="tab-task">巡查任务</button>
+                <button class="push-tab" data-tab="tab-dispatch">调度建议</button>
+              </div>
+
+              <div class="push-panel active" id="tab-risk">
+                <div class="push-item active" style="--push-color: var(--risk-mid-high);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--risk-mid-high)"></span>中高风险提醒</div>
+                    <div class="push-time">2分钟前</div>
+                  </div>
+                  <h4>防城港、钦州沿海区域需持续关注台风外围降雨云系变化</h4>
+                  <p>建议保持沿海风险点高频巡查，重点核查内涝点、海堤薄弱段及临海作业区预警响应状态。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">沿海联动</span>
+                    <span class="push-tag">灾种：台风◎</span>
+                    <span class="push-tag">等级：橙</span>
+                  </div>
+                </div>
+
+                <div class="push-item" style="--push-color: var(--risk-high);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--risk-high)"></span>高风险提醒</div>
+                    <div class="push-time">8分钟前</div>
+                  </div>
+                  <h4>北海近海风雨增强，海洋灾害风险进入重点防守时段</h4>
+                  <p>建议加强海堤、港区、渔港和涉海作业点监测，必要时执行临时管控措施。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">海洋风险</span>
+                    <span class="push-tag">灾种：台风◎</span>
+                    <span class="push-tag">等级：红</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="push-panel" id="tab-task">
+                <div class="push-item active" style="--push-color: var(--haz-geology);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--haz-geology)"></span>巡查任务</div>
+                    <div class="push-time">5分钟前</div>
+                  </div>
+                  <h4>桂林、贺州北部山区建议加密地质灾害隐患点巡查频次</h4>
+                  <p>结合近期降雨过程，建议对滑坡、崩塌、切坡建房周边点位开展一次快速复核。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">山地巡查</span>
+                    <span class="push-tag">灾种：地灾▲</span>
+                    <span class="push-tag">优先序号：01</span>
+                  </div>
+                </div>
+
+                <div class="push-item" style="--push-color: var(--haz-flood);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--haz-flood)"></span>巡查任务</div>
+                    <div class="push-time">11分钟前</div>
+                  </div>
+                  <h4>南宁、柳州城市易涝点建议开展排水口与低洼路段复核</h4>
+                  <p>重点复核地下通道、老旧小区周边、立交桥下穿区及校园医院周边通行状况。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">城市内涝</span>
+                    <span class="push-tag">灾种：洪涝≈</span>
+                    <span class="push-tag">优先序号：02</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="push-panel" id="tab-dispatch">
+                <div class="push-item active" style="--push-color: var(--haz-flood);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--haz-flood)"></span>调度建议</div>
+                    <div class="push-time">7分钟前</div>
+                  </div>
+                  <h4>南宁、贵港建议前置排水抢险资源与照明设备</h4>
+                  <p>可结合积水易发点清单，将泵车、沙袋、照明设备与值守人员分片布控，提高响应效率。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">资源前置</span>
+                    <span class="push-tag">编号：D-01</span>
+                  </div>
+                </div>
+
+                <div class="push-item" style="--push-color: var(--haz-typhoon);">
+                  <div class="push-meta">
+                    <div class="push-level"><span class="dot" style="background:var(--haz-typhoon)"></span>调度建议</div>
+                    <div class="push-time">16分钟前</div>
+                  </div>
+                  <h4>建议生成“广西南部沿海台风影响专题简报”自动草稿</h4>
+                  <p>可按风险值、重点地市、灾种贡献占比与趋势图自动汇总形成值班简报模板。</p>
+                  <div class="push-tags">
+                    <span class="push-tag">简报草稿</span>
+                    <span class="push-tag">编号：D-02</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">风险指标总览</div>
+          </div>
+          <div class="panel-body">
+            <div class="scroll" style="padding-right:0;">
+              <div class="metrics">
+                <div class="metric">
+                  <div class="k">高风险地市</div>
+                  <div class="v" style="color:var(--risk-high)">3</div>
+                  <div class="d">红色等级，重点值守</div>
+                </div>
+                <div class="metric">
+                  <div class="k">中高风险地市</div>
+                  <div class="v" style="color:var(--risk-mid-high)">5</div>
+                  <div class="d">橙色等级，持续跟踪</div>
+                </div>
+                <div class="metric">
+                  <div class="k">中风险地市</div>
+                  <div class="v" style="color:var(--risk-mid)">4</div>
+                  <div class="d">黄色等级，动态监测</div>
+                </div>
+                <div class="metric">
+                  <div class="k">中低风险地市</div>
+                  <div class="v" style="color:var(--risk-mid-low)">2</div>
+                  <div class="d">蓝色等级，常态巡查</div>
+                </div>
+              </div>
+
+              <div class="mini-chart-card">
+                <div class="mini-chart-title">
+                  <div class="t">各灾种风险贡献占比</div>
+                  <div class="s">颜色与灾种标识保持一致</div>
+                </div>
+                <div class="mini-legend-row">
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-flood)">≈</span>洪涝</span>
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-geology)">▲</span>地灾</span>
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-typhoon)">◎</span>台风</span>
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-drought)">☼</span>干旱</span>
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-fire)">✦</span>火灾</span>
+                  <span class="hazard-chip"><span class="haz-ico" style="background:var(--haz-cold)">❄</span>低温</span>
+                </div>
+                <div id="riskMiniChart"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 中 -->
+      <section class="col center">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">广西14地市综合风险分区主图</div>
+          </div>
+          <div class="panel-body">
+            <div class="map-main">
+              <div id="mainSatelliteMap"></div>
+              <div class="map-mask"></div>
+
+              <div class="floating-title">卫星遥感主视图 · 地市风险点位 · 分类标注联动预览</div>
+
+              <div class="map-overlay-box map-tools">
+                <button class="tool-btn" id="btnSat">卫星底图</button>
+                <button class="tool-btn" id="btnNormal">普通底图</button>
+                <button class="tool-btn" id="btnReset">重置视图</button>
+              </div>
+
+              <div class="map-overlay-box main-map-legend">
+                <div class="h">灾害类别快速标注</div>
+                <div class="hazard-list">
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-flood)">≈</span>洪涝</div>
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-geology)">▲</span>地质灾害</div>
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-typhoon)">◎</span>台风</div>
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-drought)">☼</span>干旱</div>
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-fire)">✦</span>森林火灾</div>
+                  <div class="hazard-item"><span class="haz-ico" style="background:var(--haz-cold)">❄</span>低温冷冻</div>
+                </div>
+                <div class="p">
+                  风险等级统一采用红、橙、黄、蓝四色标注；灾害类型使用独立图标色进行辅助识别。主图不叠加中部分区形状块，仅保留点位、标签与分类圆点，保证底图阅读清晰。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">灾种趋势分析</div>
+          </div>
+          <div class="panel-body">
+            <div id="trendChart"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右 -->
+      <section class="col right">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">14地市风险等级清单</div>
+          </div>
+          <div class="panel-body">
+            <div class="scroll">
+              <div class="city-list" id="cityList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">数据库入口界面</div>
+          </div>
+          <div class="panel-body">
+            <div class="db-wrap">
+              <div class="db-banner">
+                <h3>自然灾害数据资源中心</h3>
+                <p>汇聚地质灾害、洪涝风险、台风路径、应急资源、县区底图、重点隐患点等多源信息，支持统一查询、预览与调用。</p>
+              </div>
+              <div class="db-grid">
+                <div class="db-card">
+                  <div>
+                    <div class="icon">🗺</div>
+                    <div class="name">基础地理库</div>
+                    <div class="desc">行政区划、河流、水系、DEM、高程、道路与遥感底图。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+                <div class="db-card">
+                  <div>
+                    <div class="icon">⛰</div>
+                    <div class="name">地质灾害库</div>
+                    <div class="desc">滑坡、崩塌、泥石流、隐患点、敏感区与治理工程信息。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+                <div class="db-card">
+                  <div>
+                    <div class="icon">🌊</div>
+                    <div class="name">洪涝风险库</div>
+                    <div class="desc">暴雨、积水易涝点、沿江沿海风险带、历史淹没范围等。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+                <div class="db-card">
+                  <div>
+                    <div class="icon">🌀</div>
+                    <div class="name">台风海洋库</div>
+                    <div class="desc">台风路径、风暴潮、沿海灾情、海洋观测与预警信息。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+                <div class="db-card">
+                  <div>
+                    <div class="icon">📡</div>
+                    <div class="name">监测预警库</div>
+                    <div class="desc">雨量、水位、位移、气象站、雷达与多源感知监测数据。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+                <div class="db-card">
+                  <div>
+                    <div class="icon">🚑</div>
+                    <div class="name">应急资源库</div>
+                    <div class="desc">避灾点、队伍、物资仓库、医院、救援装备与联动机制。</div>
+                  </div>
+                  <div class="go">点击进入 →</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // 风险等级与灾种颜色分离
+    const riskColors = {
+      '高风险': getComputedStyle(document.documentElement).getPropertyValue('--risk-high').trim(),
+      '中高风险': getComputedStyle(document.documentElement).getPropertyValue('--risk-mid-high').trim(),
+      '中风险': getComputedStyle(document.documentElement).getPropertyValue('--risk-mid').trim(),
+      '中低风险': getComputedStyle(document.documentElement).getPropertyValue('--risk-mid-low').trim()
+    };
+
+    const hazardStyle = {
+      '洪涝': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-flood').trim(), icon:'≈' },
+      '地质灾害': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-geology').trim(), icon:'▲' },
+      '台风': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-typhoon').trim(), icon:'◎' },
+      '干旱': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-drought').trim(), icon:'☼' },
+      '森林火灾': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-fire').trim(), icon:'✦' },
+      '低温冷冻': { color:getComputedStyle(document.documentElement).getPropertyValue('--haz-cold').trim(), icon:'❄' }
+    };
+
+    const cityData = [
+      {name:'南宁市', lat:22.8240, lng:108.3200, risk:'中高风险', score:82, major:'洪涝 / 地质灾害', tag:'tag-mid-high', hazard:'洪涝', desc:'中南部综合风险较高，需关注城市内涝与地质灾害联动。', labelDir:'right', labelOffset:[8,0], hazardOffset:[0.10,0.10]},
+      {name:'柳州市', lat:24.3260, lng:109.4280, risk:'中高风险', score:78, major:'洪涝 / 工程地灾', tag:'tag-mid-high', hazard:'地质灾害', desc:'山地丘陵及河谷条件叠加，汛期地质灾害和洪涝风险并存。', labelDir:'right', labelOffset:[8,-2], hazardOffset:[0.10,-0.12]},
+      {name:'桂林市', lat:25.2740, lng:110.2990, risk:'中风险', score:68, major:'洪涝 / 低温冷冻', tag:'tag-mid', hazard:'低温冷冻', desc:'北部山地与景区集中，需关注洪涝、低温冷冻及崩塌滑坡。', labelDir:'right', labelOffset:[8,-6], hazardOffset:[0.14,0.10]},
+      {name:'梧州市', lat:23.4760, lng:111.2790, risk:'中高风险', score:79, major:'洪涝 / 台风外围影响', tag:'tag-mid-high', hazard:'台风', desc:'强降雨与台风外围云系共同影响，水系风险较突出。', labelDir:'right', labelOffset:[8,0], hazardOffset:[0.10,-0.10]},
+      {name:'北海市', lat:21.4810, lng:109.1200, risk:'高风险', score:90, major:'台风 / 风暴潮', tag:'tag-high', hazard:'台风', desc:'沿海城市，重点关注台风、风暴潮、海浪及暴雨内涝。', labelDir:'right', labelOffset:[8,10], hazardOffset:[0.12,0.10]},
+      {name:'防城港市', lat:21.6860, lng:108.3540, risk:'高风险', score:91, major:'台风 / 海洋灾害', tag:'tag-high', hazard:'台风', desc:'海洋灾害、暴雨山洪及地质灾害风险较高。', labelDir:'right', labelOffset:[8,12], hazardOffset:[0.12,-0.10]},
+      {name:'钦州市', lat:21.9670, lng:108.6240, risk:'高风险', score:88, major:'洪涝 / 台风', tag:'tag-high', hazard:'洪涝', desc:'滨海区域需重点关注暴雨积涝、风暴潮及强风灾害。', labelDir:'right', labelOffset:[8,6], hazardOffset:[0.10,0.10]},
+      {name:'贵港市', lat:23.1110, lng:109.6020, risk:'中风险', score:64, major:'洪涝', tag:'tag-mid', hazard:'洪涝', desc:'平原及河网区较多，汛期局地积涝需持续监测。', labelDir:'right', labelOffset:[8,0], hazardOffset:[0.10,-0.12]},
+      {name:'玉林市', lat:22.6310, lng:110.1540, risk:'中高风险', score:74, major:'洪涝 / 干旱季节性并存', tag:'tag-mid-high', hazard:'干旱', desc:'区域气候季节差异明显，局地存在洪涝与阶段性干旱并存特征。', labelDir:'right', labelOffset:[8,8], hazardOffset:[0.10,0.10]},
+      {name:'百色市', lat:23.9030, lng:106.6180, risk:'中风险', score:60, major:'干旱 / 山地地灾', tag:'tag-mid', hazard:'干旱', desc:'西部山地广布，需关注旱情发展及山区隐患点。', labelDir:'right', labelOffset:[8,0], hazardOffset:[0.10,-0.10]},
+      {name:'贺州市', lat:24.4040, lng:111.5670, risk:'中高风险', score:76, major:'洪涝 / 地质灾害', tag:'tag-mid-high', hazard:'地质灾害', desc:'丘陵山地区域较多，需防范短时强降雨诱发的滑坡崩塌。', labelDir:'right', labelOffset:[8,-2], hazardOffset:[0.10,0.10]},
+      {name:'河池市', lat:24.6950, lng:108.0620, risk:'中风险', score:62, major:'地质灾害 / 干旱', tag:'tag-mid', hazard:'地质灾害', desc:'喀斯特地貌突出，地质环境敏感，风险转换明显。', labelDir:'right', labelOffset:[8,-4], hazardOffset:[0.10,-0.12]},
+      {name:'来宾市', lat:23.7330, lng:109.2290, risk:'中低风险', score:50, major:'洪涝', tag:'tag-mid-low', hazard:'洪涝', desc:'综合风险中等偏低，但局地极端天气过程仍需关注。', labelDir:'right', labelOffset:[8,0], hazardOffset:[0.10,0.10]},
+      {name:'崇左市', lat:22.3780, lng:107.3640, risk:'中低风险', score:48, major:'洪涝 / 边境山区地灾', tag:'tag-mid-low', hazard:'地质灾害', desc:'西南边境地形复杂，局地山洪和坡面灾害需重点巡查。', labelDir:'right', labelOffset:[8,8], hazardOffset:[0.10,-0.10]}
+    ];
+
+    // 右侧列表
+    const cityList = document.getElementById('cityList');
+    cityData.forEach(c => {
+      const hz = hazardStyle[c.hazard];
+      const row = document.createElement('div');
+      row.className = 'city-row';
+      row.innerHTML = `
+        <div class="city-name">${c.name}</div>
+        <div class="risk-tag ${c.tag}">${c.risk}</div>
+        <div class="city-preview">
+          <div><strong style="color:#fff;">${c.name}</strong></div>
+          <div>综合风险值：${c.score}</div>
+          <div>主要灾种：${c.major}</div>
+          <div>灾种识别：<span class="hazard-chip" style="padding:2px 8px;"><span class="haz-ico" style="background:${hz.color}">${hz.icon}</span>${c.hazard}</span></div>
+          <div style="margin-top:4px;color:#9fc1db;">${c.desc}</div>
+        </div>
+      `;
+      cityList.appendChild(row);
+    });
+
+    // 地图
+    const map = L.map('mainSatelliteMap', {
+      center:[23.5,108.8],
+      zoom:7,
+      zoomControl:true,
+      attributionControl:true
+    });
+
+    const satelliteLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom:18, attribution:'Tiles &copy; Esri' }
+    );
+
+    const normalLayer = L.tileLayer(
+      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { maxZoom:18, attribution:'&copy; OpenStreetMap' }
+    );
+
+    satelliteLayer.addTo(map);
+    const gxBounds = [[20.9,104.4],[26.6,112.3]];
+    map.fitBounds(gxBounds);
+
+    const gxOutline = [
+      [21.2,108.0],[21.3,108.7],[21.2,109.4],[21.4,109.9],[21.7,110.4],[22.0,110.8],[22.4,111.2],[22.8,111.5],
+      [23.4,111.7],[24.0,111.8],[24.7,111.5],[25.4,111.2],[25.8,110.7],[25.9,110.0],[25.6,109.2],[25.2,108.6],
+      [24.9,108.0],[24.7,107.3],[24.3,106.7],[23.8,106.2],[23.1,106.0],[22.5,106.3],[22.0,106.9],[21.5,107.5],[21.2,108.0]
+    ];
+
+    L.polygon(gxOutline,{
+      color:'#93dcff',
+      weight:3,
+      fill:false,
+      opacity:.85,
+      dashArray:'10,7'
+    }).addTo(map);
+
+    cityData.forEach(c => {
+      const hz = hazardStyle[c.hazard];
+      const riskColor = riskColors[c.risk];
+
+      const marker = L.circleMarker([c.lat, c.lng], {
+        radius: Math.max(6, c.score / 12),
+        color:riskColor,
+        weight:2.2,
+        fillColor:riskColor,
+        fillOpacity:.82
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div style="font-family:Microsoft YaHei;min-width:210px;line-height:1.7;">
+          <div style="font-weight:800;color:#fff;">${c.name}</div>
+          <div>风险等级：<span style="color:${riskColor};font-weight:700;">${c.risk}</span></div>
+          <div>综合风险值：${c.score}</div>
+          <div>主要灾种：${c.major}</div>
+          <div>灾种识别：<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:18px;height:18px;border-radius:50%;background:${hz.color};display:inline-flex;align-items:center;justify-content:center;color:#09121b;font-size:11px;font-weight:700;">${hz.icon}</span>${c.hazard}</span></div>
+          <div style="margin-top:4px;color:#a7c5df;">${c.desc}</div>
+        </div>
+      `);
+
+      marker.bindTooltip(`${c.name} · ${c.risk}`, {
+        direction:'top',
+        sticky:true,
+        opacity:0.95
+      });
+
+      L.tooltip({
+        permanent:true,
+        direction:c.labelDir || 'right',
+        offset:c.labelOffset || [8,0],
+        className:'city-label'
+      }).setContent(c.name).setLatLng([c.lat, c.lng]).addTo(map);
+
+      L.circleMarker([c.lat + c.hazardOffset[0], c.lng + c.hazardOffset[1]], {
+        radius:4.4,
+        color:'#fff',
+        weight:1,
+        fillColor:hz.color,
+        fillOpacity:1
+      }).addTo(map).bindTooltip(`${c.name} · ${hz.icon} ${c.hazard}`, {
+        direction:'top',
+        sticky:true,
+        opacity:0.95
+      });
+    });
+
+    document.getElementById('btnSat').onclick = ()=>{
+      if(map.hasLayer(normalLayer)) map.removeLayer(normalLayer);
+      if(!map.hasLayer(satelliteLayer)) satelliteLayer.addTo(map);
+    };
+    document.getElementById('btnNormal').onclick = ()=>{
+      if(map.hasLayer(satelliteLayer)) map.removeLayer(satelliteLayer);
+      if(!map.hasLayer(normalLayer)) normalLayer.addTo(map);
+    };
+    document.getElementById('btnReset').onclick = ()=> map.fitBounds(gxBounds);
+
+    // 趋势图：灾种颜色体系
+    const trendChart = echarts.init(document.getElementById('trendChart'));
+    trendChart.setOption({
+      backgroundColor:'transparent',
+      animationDuration:900,
+      tooltip:{
+        trigger:'axis',
+        backgroundColor:'rgba(8,22,38,.96)',
+        borderColor:'rgba(73,213,255,.2)',
+        textStyle:{color:'#eaf6ff'}
+      },
+      legend:{
+        top:4,
+        textStyle:{color:'#d6ebff', fontSize:12},
+        itemWidth:18,
+        itemHeight:10
+      },
+      grid:{left:46,right:20,top:44,bottom:28},
+      xAxis:{
+        type:'category',
+        boundaryGap:false,
+        data:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+        axisLine:{lineStyle:{color:'#426786'}},
+        axisTick:{show:false},
+        axisLabel:{color:'#b9d3ea'}
+      },
+      yAxis:{
+        type:'value',
+        max:100,
+        splitNumber:5,
+        axisLine:{show:false},
+        splitLine:{lineStyle:{color:'rgba(255,255,255,.08)'}},
+        axisLabel:{color:'#9fc1db'}
+      },
+      series:[
+        {
+          name:'洪涝',
+          type:'line',
+          smooth:true,
+          symbol:'circle',
+          symbolSize:7,
+          lineStyle:{width:3,color:getComputedStyle(document.documentElement).getPropertyValue('--haz-flood').trim()},
+          itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-flood').trim()},
+          areaStyle:{color:'rgba(53,200,255,.12)'},
+          data:[20,23,27,40,55,77,91,90,71,50,31,23]
+        },
+        {
+          name:'地质灾害',
+          type:'line',
+          smooth:true,
+          symbol:'circle',
+          symbolSize:7,
+          lineStyle:{width:3,color:getComputedStyle(document.documentElement).getPropertyValue('--haz-geology').trim()},
+          itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-geology').trim()},
+          areaStyle:{color:'rgba(103,221,154,.10)'},
+          data:[18,21,24,32,46,67,80,79,62,44,28,20]
+        },
+        {
+          name:'台风',
+          type:'line',
+          smooth:true,
+          symbol:'circle',
+          symbolSize:7,
+          lineStyle:{width:3,color:getComputedStyle(document.documentElement).getPropertyValue('--haz-typhoon').trim()},
+          itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-typhoon').trim()},
+          areaStyle:{color:'rgba(154,140,255,.08)'},
+          data:[1,1,2,5,11,21,50,72,69,30,9,2]
+        }
+      ]
+    });
+
+    // 左下图表：修复遮挡
+    const riskMiniChart = echarts.init(document.getElementById('riskMiniChart'));
+    riskMiniChart.setOption({
+      backgroundColor:'transparent',
+      animationDuration:700,
+      tooltip:{
+        trigger:'axis',
+        axisPointer:{type:'shadow'},
+        backgroundColor:'rgba(8,22,38,.96)',
+        borderColor:'rgba(73,213,255,.2)',
+        textStyle:{color:'#eaf6ff'}
+      },
+      grid:{left:34,right:10,top:14,bottom:40},
+      xAxis:{
+        type:'category',
+        data:['洪涝','地灾','台风','干旱','火灾','低温'],
+        axisLine:{lineStyle:{color:'#3d6686'}},
+        axisTick:{show:false},
+        axisLabel:{
+          color:'#b7d0e8',
+          fontSize:11,
+          interval:0,
+          margin:12
+        }
+      },
+      yAxis:{
+        type:'value',
+        max:100,
+        splitNumber:4,
+        axisLine:{show:false},
+        axisTick:{show:false},
+        axisLabel:{color:'#9dbed8',fontSize:11},
+        splitLine:{lineStyle:{color:'rgba(255,255,255,.07)'}}
+      },
+      series:[
+        {
+          name:'风险贡献值',
+          type:'bar',
+          barWidth:16,
+          data:[
+            {value:86,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-flood').trim()}},
+            {value:79,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-geology').trim()}},
+            {value:68,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-typhoon').trim()}},
+            {value:42,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-drought').trim()}},
+            {value:23,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-fire').trim()}},
+            {value:18,itemStyle:{color:getComputedStyle(document.documentElement).getPropertyValue('--haz-cold').trim()}}
+          ],
+          label:{
+            show:true,
+            position:'top',
+            color:'#dff0ff',
+            fontSize:10,
+            distance:4
+          },
+          emphasis:{
+            itemStyle:{
+              shadowBlur:14,
+              shadowColor:'rgba(73,214,255,.35)'
+            }
+          }
+        }
+      ]
+    });
+
+    // 推送：时钟
+    function updateClock(){
+      const now = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      document.getElementById('pushClock').textContent =
+        `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+    updateClock();
+    setInterval(updateClock,1000);
+
+    // tabs 切换
+    const tabs = [...document.querySelectorAll('.push-tab')];
+    const panels = [...document.querySelectorAll('.push-panel')];
+    tabs.forEach(tab=>{
+      tab.addEventListener('click', ()=>{
+        tabs.forEach(t=>t.classList.remove('active'));
+        panels.forEach(p=>p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // 每个tab内自动高亮轮播
+    const panelTimers = new Map();
+
+    function setupPanelLoop(panel){
+      const items = [...panel.querySelectorAll('.push-item')];
+      let index = 0;
+      let timer = null;
+
+      const activate = (i)=>{
+        items.forEach((it,idx)=>it.classList.toggle('active', idx===i));
+        index = i;
+      };
+
+      const start = ()=>{
+        stop();
+        timer = setInterval(()=>{
+          index = (index + 1) % items.length;
+          activate(index);
+        }, 2600);
+        panelTimers.set(panel.id, timer);
+      };
+
+      const stop = ()=>{
+        const t = panelTimers.get(panel.id);
+        if(t) clearInterval(t);
+      };
+
+      items.forEach((item,i)=>{
+        item.addEventListener('mouseenter', ()=>{ stop(); activate(i); });
+        item.addEventListener('mouseleave', ()=>{ start(); });
+        item.addEventListener('click', ()=>{ activate(i); });
+      });
+
+      start();
+    }
+
+    panels.forEach(setupPanelLoop);
+
+    window.addEventListener('resize', ()=>{
+      trendChart.resize();
+      riskMiniChart.resize();
+      map.invalidateSize();
+    });
+  </script>
+</body>
+</html>

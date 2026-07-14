@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>灾擎 - 综合指挥大屏</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+:root{--bg:#0a0e1a;--panel:rgba(12,20,40,0.92);--border:rgba(6,182,212,0.35);--cyan:#06B6D4;--cyan2:#22D3EE;--blue:#3B82F6;--text:#E6F4FF;--sub:#7BA4C0;--red:#EF4444;--orange:#F59E0B;--green:#10B981}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+body{background:radial-gradient(circle at 10% 20%,rgba(6,182,212,0.08),transparent 30%),radial-gradient(circle at 90% 80%,rgba(59,130,246,0.06),transparent 30%),linear-gradient(180deg,#080c18,#0a0e1a 50%,#0c1020)}
+.dashboard{display:grid;grid-template-columns:320px 1fr 320px;grid-template-rows:auto 1fr auto auto;gap:12px;padding:12px;height:100vh;width:100vw}
+.header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,rgba(12,20,40,0.95),rgba(10,14,26,0.88));border:1px solid var(--border);border-radius:12px;padding:14px 28px;position:relative;overflow:hidden}
+.header::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan2),transparent)}
+.header h1{font-size:28px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,var(--cyan2),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-info{display:flex;gap:24px;font-size:13px;color:var(--sub)}
+.header-info span{display:flex;align-items:center;gap:6px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:hidden;position:relative}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.panel-title{font-size:14px;font-weight:700;color:var(--cyan2);margin-bottom:12px;padding-left:10px;border-left:3px solid var(--cyan);letter-spacing:1px}
+.left-col{display:flex;flex-direction:column;gap:12px;grid-row:2/4}
+.right-col{display:flex;flex-direction:column;gap:12px;grid-row:2/4}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:10px;text-align:center}
+.stat-card .label{font-size:11px;color:var(--sub);margin-bottom:4px}
+.stat-card .value{font-size:22px;font-weight:800;color:var(--cyan2)}
+.stat-card .value.red{color:var(--red)}.stat-card .value.orange{color:var(--orange)}.stat-card .value.green{color:var(--green)}
+.sensor-list{list-style:none}
+.sensor-list li{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(6,182,212,0.08);font-size:12px}
+.sensor-list li:last-child{border-bottom:none}
+.sensor-name{color:var(--sub)}.sensor-val{font-weight:700;color:var(--cyan2)}
+.sensor-status{font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)}
+.sensor-status.warn{background:rgba(245,158,11,0.15);color:var(--orange)}
+.chart-container{width:100%;height:180px}
+.center-area{display:flex;flex-direction:column;gap:12px;grid-row:2/3}
+.map-wrapper{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;position:relative;overflow:hidden}
+.map-wrapper canvas{width:100%;height:100%;display:block}
+.kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.kpi-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.kpi-item .kpi-label{font-size:11px;color:var(--sub);margin-bottom:6px}
+.kpi-item .kpi-value{font-size:26px;font-weight:800;color:var(--cyan2)}
+.kpi-item .kpi-unit{font-size:11px;color:var(--sub);margin-left:2px}
+.video-section{grid-column:2/3;grid-row:3/4}
+.video-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.video-card{background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none;transition:all 0.3s}
+.video-card:hover{border-color:var(--cyan);background:rgba(6,182,212,0.10);transform:translateY(-2px);box-shadow:0 4px 20px rgba(6,182,212,0.2)}
+.video-card .vc-icon{font-size:28px;position:relative;z-index:1}
+.video-card .vc-name{font-size:10px;color:var(--text);font-weight:600;position:relative;z-index:1;text-align:center;letter-spacing:0.5px}
+.video-card .vc-open{font-size:9px;color:var(--cyan);position:relative;z-index:1;opacity:0;transition:opacity 0.3s}
+.video-card:hover .vc-open{opacity:1}
+.live-badge{position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px;z-index:2;animation:livePulse 2s ease-in-out infinite;letter-spacing:1px}
+@keyframes livePulse{0%,100%{opacity:1}50%{opacity:0.7}}
+.alert-ring-chart{width:100%;height:160px}
+.alert-list{list-style:none}
+.alert-list li{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:12px}
+.alert-list li:last-child{border-bottom:none}
+.alert-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.alert-dot.red{background:var(--red)}.alert-dot.orange{background:var(--orange)}.alert-dot.cyan{background:var(--cyan)}
+.alert-count{margin-left:auto;font-weight:700;color:var(--cyan2)}
+.data-center-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dc-stat{background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.12);border-radius:8px;padding:10px;text-align:center}
+.dc-stat .dc-label{font-size:11px;color:var(--sub);margin-bottom:4px}
+.dc-stat .dc-value{font-size:18px;font-weight:800;color:var(--cyan2)}
+.linkage-list{list-style:none}
+.linkage-list li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:11px}
+.linkage-list li:last-child{border-bottom:none}
+.linkage-time{color:var(--sub);white-space:nowrap;min-width:56px}
+.linkage-type{color:var(--text)}
+.linkage-badge{margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.linkage-badge.done{background:rgba(16,185,129,0.15);color:var(--green)}
+.linkage-badge.pending{background:rgba(245,158,11,0.15);color:var(--orange)}
+.arch-section{grid-column:1/-1;grid-row:4/5}
+.arch-flow{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+.arch-step{background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px}
+.arch-step .step-title{font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px}
+.arch-step .step-icons{display:flex;gap:6px;justify-content:center;font-size:16px}
+.arch-arrow{color:var(--cyan);font-size:18px;opacity:0.6}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:rgba(6,182,212,0.2);border-radius:999px}
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <div class="header">
+    <h1>灾擎 · 自然灾害综合指挥大屏</h1>
+    <div class="header-info">
+      <span><i class="status-dot"></i>系统运行正常</span>
+      <span id="clock">--</span>
+      <span>️ 广西 · 多云 28°C</span>
+      <span>数据更新: 实时</span>
+    </div>
+  </div>
+
+  <div class="left-col">
+    <div class="panel">
+      <div class="panel-title">灾情数据库概览</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="label">总记录数</div><div class="value">12,847</div></div>
+        <div class="stat-card"><div class="label">今日新增</div><div class="value red">+23</div></div>
+        <div class="stat-card"><div class="label">活跃灾害</div><div class="value orange">18</div></div>
+        <div class="stat-card"><div class="label">已处置</div><div class="value green">156</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">多源感知接入</div>
+      <ul class="sensor-list">
+        <li><span class="sensor-name">📡 气象监测站</span><span class="sensor-val">1,256 台</span><span class="sensor-status">在线</span></li>
+        <li><span class="sensor-name">🌊 水文传感器</span><span class="sensor-val">843 台</span><span class="sensor-status">在线</span></li>
+        <li><span class="sensor-name">📐 地质位移计</span><span class="sensor-val">567 台</span><span class="sensor-status">在线</span></li>
+        <li><span class="sensor-name">🔥 林火热点</span><span class="sensor-val">312 个</span><span class="sensor-status warn">预警</span></li>
+        <li><span class="sensor-name">📹 视频监控</span><span class="sensor-val">2,089 路</span><span class="sensor-status">在线</span></li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-title">灾害类型分布</div>
+      <div class="chart-container" id="disasterTypeChart"></div>
+    </div>
+  </div>
+
+  <div class="center-area">
+    <div class="kpi-strip">
+      <div class="kpi-item"><div class="kpi-label">监测区域</div><div class="kpi-value">35<span class="kpi-unit">个</span></div></div>
+      <div class="kpi-item"><div class="kpi-label">覆盖面积</div><div class="kpi-value">2,560<span class="kpi-unit">km²</span></div></div>
+      <div class="kpi-item"><div class="kpi-label">预警事件(今日)</div><div class="kpi-value red">23<span class="kpi-unit">起</span></div></div>
+      <div class="kpi-item"><div class="kpi-label">处置中</div><div class="kpi-value orange">18<span class="kpi-unit">起</span></div></div>
+      <div class="kpi-item"><div class="kpi-label">已完成</div><div class="kpi-value green">156<span class="kpi-unit">起</span></div></div>
+      <div class="kpi-item"><div class="kpi-label">AI分析准确率</div><div class="kpi-value">92<span class="kpi-unit">%</span></div></div>
+    </div>
+    <div class="map-wrapper" id="mapContainer"><canvas id="gxMap"></canvas></div>
+  </div>
+
+  <div class="video-section">
+    <div class="panel">
+      <div class="panel-title">视频融合 · 实时监控（点击打开）</div>
+      <div class="video-strip">
+        <a class="video-card" href="https://www.windy.com/zh/-Satellite-satellite?satellite,22.5,108.5,7" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">🛰️</span><span class="vc-name">FY-4A 卫星云图</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+        <a class="video-card" href="https://www.windy.com/zh/-Radar-radar?radar,22.5,108.5,7" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">📡</span><span class="vc-name">广西气象雷达</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+        <a class="video-card" href="https://www.windy.com/zh/-Temperature-temperature?temperature,22.5,108.5,7" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">️</span><span class="vc-name">广西温度分布</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+        <a class="video-card" href="https://www.windy.com/zh/-Lightning-lightning?lightning,22.5,108.5,7" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">⚡</span><span class="vc-name">闪电定位监测</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+        <a class="video-card" href="https://earth.nullschool.net/#current/wind/surface/level/overlay=temp/orthographic=108.5,22.5,1200" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">️</span><span class="vc-name">全球风场实况</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+        <a class="video-card" href="https://www.windy.com/zh/-Rain-accumulation-rainAccu?rainAccu,22.5,108.5,7" target="_blank">
+          <span class="live-badge">● LIVE</span><span class="vc-icon">🌧️</span><span class="vc-name">降雨量累积预报</span><span class="vc-open">🔗 点击打开</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="panel">
+      <div class="panel-title">AI 预警中心</div>
+      <div class="alert-ring-chart" id="alertRingChart"></div>
+      <ul class="alert-list">
+        <li><span class="alert-dot red"></span>人员聚集<span class="alert-count">8 起</span></li>
+        <li><span class="alert-dot red"></span>区域入侵<span class="alert-count">6 起</span></li>
+        <li><span class="alert-dot orange"></span>异常徘徊<span class="alert-count">4 起</span></li>
+        <li><span class="alert-dot orange"></span>烟火识别<span class="alert-count">3 起</span></li>
+        <li><span class="alert-dot cyan"></span>车辆异常<span class="alert-count">2 起</span></li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-title">数据中台</div>
+      <div class="data-center-stats">
+        <div class="dc-stat"><div class="dc-label">数据汇聚</div><div class="dc-value">1.26 TB</div></div>
+        <div class="dc-stat"><div class="dc-label">治理率</div><div class="dc-value" style="color:var(--green)">92%</div></div>
+        <div class="dc-stat"><div class="dc-label">结构化数据</div><div class="dc-value">68.5 亿条</div></div>
+        <div class="dc-stat"><div class="dc-label">设备接入</div><div class="dc-value">1,256 台</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">警情联动</div>
+      <ul class="linkage-list">
+        <li><span class="linkage-time">10:28:15</span><span class="linkage-type">可疑人员聚集</span><span class="linkage-badge done">已联动</span></li>
+        <li><span class="linkage-time">10:24:33</span><span class="linkage-type">区域入侵</span><span class="linkage-badge done">已联动</span></li>
+        <li><span class="linkage-time">10:18:07</span><span class="linkage-type">车辆异常</span><span class="linkage-badge pending">处理中</span></li>
+        <li><span class="linkage-time">10:12:44</span><span class="linkage-type">烟火识别</span><span class="linkage-badge done">已联动</span></li>
+        <li><span class="linkage-time">10:05:21</span><span class="linkage-type">异常徘徊</span><span class="linkage-badge done">已联动</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="arch-section">
+    <div class="panel">
+      <div class="panel-title">技术架构</div>
+      <div class="arch-flow">
+        <div class="arch-step"><div class="step-title">前端感知</div><div class="step-icons"> 🏔️ 🔥</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">通信传输</div><div class="step-icons">5G 📶 专网 IoT</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">平台支撑</div><div class="step-icons">☁️ API 🖥️</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">数据资源</div><div class="step-icons">🗄️ 📊 💾</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">AI智能</div><div class="step-icons">🧠  📈 🤖</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">业务应用</div><div class="step-icons">📋 🚨 🗂️</div></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-step"><div class="step-title">指挥决策</div><div class="step-icons">🎯 📡 ✅</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateClock(){var n=new Date(),p=function(x){return String(x).padStart(2,'0')};document.getElementById('clock').textContent=n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+' '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds())}
+updateClock();setInterval(updateClock,1000);
+
+var typeChart=echarts.init(document.getElementById('disasterTypeChart'));
+typeChart.setOption({tooltip:{trigger:'item'},series:[{type:'pie',radius:['40%','70%'],center:['50%','50%'],avoidLabelOverlap:true,label:{show:false},data:[
+  {value:3842,name:'洪涝',itemStyle:{color:'#3B82F6'}},{value:2956,name:'山体滑坡',itemStyle:{color:'#F59E0B'}},
+  {value:2134,name:'台风',itemStyle:{color:'#06B6D4'}},{value:1876,name:'干旱',itemStyle:{color:'#EF4444'}},
+  {value:1245,name:'地震',itemStyle:{color:'#8B5CF6'}},{value:794,name:'其他',itemStyle:{color:'#10B981'}}
+]}]});
+
+var ringChart=echarts.init(document.getElementById('alertRingChart'));
+ringChart.setOption({tooltip:{trigger:'item'},title:{text:'23\n预警总数',left:'center',top:'center',textStyle:{color:'#E6F4FF',fontSize:14,fontWeight:700}},
+series:[{type:'pie',radius:['55%','75%'],center:['50%','50%'],label:{show:false},data:[
+  {value:8,name:'人员聚集',itemStyle:{color:'#EF4444'}},{value:6,name:'区域入侵',itemStyle:{color:'#F59E0B'}},
+  {value:4,name:'异常徘徊',itemStyle:{color:'#06B6D4'}},{value:3,name:'烟火识别',itemStyle:{color:'#8B5CF6'}},
+  {value:2,name:'车辆异常',itemStyle:{color:'#10B981'}}
+]}]});
+
+// ===== GUANGXI MAP (Canvas) =====
+var cityData=[
+  {name:'南宁',x:0.52,y:0.72,risk:8,level:'red'},{name:'柳州',x:0.55,y:0.42,risk:7,level:'orange'},
+  {name:'桂林',x:0.62,y:0.22,risk:6,level:'orange'},{name:'梧州',x:0.78,y:0.55,risk:5,level:'yellow'},
+  {name:'北海',x:0.50,y:0.92,risk:4,level:'yellow'},{name:'防城港',x:0.42,y:0.88,risk:3,level:'cyan'},
+  {name:'钦州',x:0.46,y:0.85,risk:5,level:'yellow'},{name:'贵港',x:0.58,y:0.62,risk:6,level:'orange'},
+  {name:'玉林',x:0.68,y:0.72,risk:7,level:'orange'},{name:'百色',x:0.22,y:0.48,risk:8,level:'red'},
+  {name:'贺州',x:0.82,y:0.38,risk:3,level:'cyan'},{name:'河池',x:0.42,y:0.32,risk:5,level:'yellow'},
+  {name:'来宾',x:0.55,y:0.52,risk:4,level:'yellow'},{name:'崇左',x:0.35,y:0.72,risk:6,level:'orange'}
+];
+var levelColors={red:'#EF4444',orange:'#F59E0B',yellow:'#22D3EE',cyan:'#06B6D4'};
+var gxOutline=[[0.12,0.38],[0.18,0.32],[0.25,0.28],[0.32,0.25],[0.40,0.22],[0.48,0.20],[0.55,0.18],[0.62,0.20],[0.68,0.22],[0.75,0.25],[0.82,0.28],[0.88,0.32],[0.92,0.38],[0.95,0.45],[0.96,0.52],[0.94,0.60],[0.90,0.68],[0.85,0.75],[0.78,0.82],[0.70,0.88],[0.62,0.92],[0.55,0.95],[0.48,0.96],[0.40,0.94],[0.32,0.90],[0.25,0.85],[0.18,0.78],[0.14,0.70],[0.10,0.62],[0.08,0.52],[0.10,0.45],[0.12,0.38]];
+
+var mapCanvas,mapCtx,mapW,mapH;
+function initMap(){
+  mapCanvas=document.getElementById('gxMap');
+  var container=document.getElementById('mapContainer');
+  mapW=container.clientWidth;mapH=container.clientHeight;
+  mapCanvas.width=mapW*2;mapCanvas.height=mapH*2;
+  mapCanvas.style.width=mapW+'px';mapCanvas.style.height=mapH+'px';
+  mapCtx=mapCanvas.getContext('2d');
+  mapCtx.scale(2,2);
+  drawMap();
+}
+function drawMap(){
+  if(!mapCtx)return;
+  mapCtx.clearRect(0,0,mapW,mapH);
+  mapCtx.strokeStyle='rgba(6,182,212,0.06)';mapCtx.lineWidth=0.5;
+  for(var i=0;i<mapW;i+=40){mapCtx.beginPath();mapCtx.moveTo(i,0);mapCtx.lineTo(i,mapH);mapCtx.stroke()}
+  for(var j=0;j<mapH;j+=40){mapCtx.beginPath();mapCtx.moveTo(0,j);mapCtx.lineTo(mapW,j);mapCtx.stroke()}
+  mapCtx.beginPath();
+  for(var k=0;k<gxOutline.length;k++){var p=gxOutline[k];var px=p[0]*mapW,py=p[1]*mapH;if(k===0)mapCtx.moveTo(px,py);else mapCtx.lineTo(px,py)}
+  mapCtx.closePath();
+  mapCtx.fillStyle='rgba(6,182,212,0.08)';mapCtx.fill();
+  mapCtx.strokeStyle='rgba(6,182,212,0.4)';mapCtx.lineWidth=1.5;mapCtx.stroke();
+  for(var m=0;m<cityData.length;m++){
+    var c=cityData[m];var cx=c.x*mapW,cy=c.y*mapH;
+    var grad=mapCtx.createRadialGradient(cx,cy,0,cx,cy,c.risk*8);
+    grad.addColorStop(0,levelColors[c.level]+'60');grad.addColorStop(1,'transparent');
+    mapCtx.fillStyle=grad;mapCtx.beginPath();mapCtx.arc(cx,cy,c.risk*8,0,Math.PI*2);mapCtx.fill();
+  }
+  for(var n=0;n<cityData.length;n++){
+    var c2=cityData[n];var cx2=c2.x*mapW,cy2=c2.y*mapH;
+    if(c2.level==='red'||c2.level==='orange'){
+      mapCtx.strokeStyle=levelColors[c2.level]+'40';mapCtx.lineWidth=1;
+      mapCtx.beginPath();mapCtx.arc(cx2,cy2,c2.risk*3+8,0,Math.PI*2);mapCtx.stroke();
+    }
+    mapCtx.fillStyle=levelColors[c2.level];mapCtx.beginPath();mapCtx.arc(cx2,cy2,c2.level==='red'?6:c2.level==='orange'?5:4,0,Math.PI*2);mapCtx.fill();
+    mapCtx.shadowColor=levelColors[c2.level];mapCtx.shadowBlur=8;
+    mapCtx.beginPath();mapCtx.arc(cx2,cy2,3,0,Math.PI*2);mapCtx.fill();
+    mapCtx.shadowBlur=0;
+    mapCtx.fillStyle='rgba(230,244,255,0.7)';mapCtx.font='11px Microsoft YaHei';
+    mapCtx.fillText(c2.name,cx2+10,cy2+4);
+  }
+  mapCtx.fillStyle='rgba(6,182,212,0.6)';mapCtx.font='bold 14px Microsoft YaHei';
+  mapCtx.fillText('广西全域灾害态势地图',16,24);
+}
+window.addEventListener('load',initMap);
+window.addEventListener('resize',function(){initMap()});
+
+window.addEventListener('resize',function(){typeChart.resize();ringChart.resize()});
+</script>
+</body>
+</html>
