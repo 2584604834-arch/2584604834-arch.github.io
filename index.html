@@ -2,13 +2,24 @@
 <html lang="zh-CN">
 <head>
     <title>灾擎 - 自然灾害综合指挥系统</title>
-    <!-- 密码验证代码放这里 -->
-    <script>
-        const passWord = "20260714";
-        let input = prompt("请输入访问密码");
-        if(input !== passWord){
-            alert("密码错误，禁止访问");
-                       document.body.innerHTML = "";
+<script>
+// 设置你的账号和密码，自行修改引号内内容
+const username = "zaiqingAPP";
+const password = "20260714";
+
+// 弹窗输入账号
+let inputUser = prompt("请输入账号：");
+// 弹窗输入密码
+let inputPwd = prompt("请输入密码：");
+
+// 判断账号密码是否匹配
+if (inputUser !== username || inputPwd !== password) {
+    alert("账号或密码错误，禁止访问！");
+    // 清空页面内容
+    document.body.innerHTML = "";
+}
+</script>
+ </head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>灾擎 - 自然灾害综合指挥系统</title>
