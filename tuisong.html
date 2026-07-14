@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灾擎 - 预警信息一键推送平台</title>
+  <style>
+    :root{
+      --bg:#0F172A;
+      --panel:#1E293B;
+      --text:#E6F4FF;
+      --sub:#8FA8C0;
+      --cyan:#06B6D4;
+      --cyan2:#22D3EE;
+      --blue:#3B82F6;
+      --green:#10B981;
+      --orange:#F59E0B;
+      --danger:#EF4444;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+    body{position:relative;background:radial-gradient(circle at 14% 18%,rgba(6,182,212,.14),transparent 24%),radial-gradient(circle at 82% 16%,rgba(59,130,246,.10),transparent 20%),radial-gradient(circle at 70% 76%,rgba(139,92,246,.10),transparent 22%),linear-gradient(180deg,#0B1220 0%,#0F172A 48%,#0B1324 100%)}
+    body::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(34,211,238,.30) 1px,transparent 1.6px),radial-gradient(circle,rgba(59,130,246,.18) 1px,transparent 1.5px);background-size:120px 120px,180px 180px;opacity:.32;animation:dotsMove 20s linear infinite}
+    body::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,transparent 0%,rgba(34,211,238,.05) 48%,transparent 100%);opacity:.55;animation:scan 6s linear infinite}
+    @keyframes dotsMove{from{transform:translateY(0)}to{transform:translateY(24px)}}
+    @keyframes scan{0%{transform:translateY(-18%)}100%{transform:translateY(18%)}}
+    .screen{position:relative;z-index:1;width:100vw;height:100vh;padding:12px;display:grid;grid-template-columns:28% 44% 28%;grid-template-rows:72px 1fr;gap:12px}
+    .header{grid-column:1/-1;background:linear-gradient(90deg,rgba(20,31,48,.95),rgba(15,23,42,.82));border:1px solid rgba(6,182,212,.32);border-radius:16px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 0 24px rgba(6,182,212,.10);position:relative;overflow:hidden}
+    .header::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,rgba(34,211,238,.9),transparent)}
+    .header h1{font-size:26px;font-weight:900;letter-spacing:3px;color:#F9FDFF;text-shadow:0 0 18px rgba(34,211,238,.18)}
+    .header-right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--sub)}
+    .status-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);display:inline-block;margin-right:6px}
+    .panel{background:rgba(30,41,59,.92);border:1px solid rgba(6,182,212,.28);border-radius:16px;overflow:hidden;box-shadow:0 0 20px rgba(6,182,212,.08);display:flex;flex-direction:column}
+    .panel-header{height:44px;padding:0 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(6,182,212,.12);flex-shrink:0}
+    .panel-header .dot{width:5px;height:16px;border-radius:6px;background:linear-gradient(180deg,var(--cyan2),var(--cyan));box-shadow:0 0 12px rgba(34,211,238,.45)}
+    .panel-header h2{font-size:15px;font-weight:700;color:#F5FCFF;letter-spacing:1px}
+    .panel-header .badge{margin-left:auto;font-size:11px;padding:2px 10px;border-radius:999px;background:rgba(6,182,212,.15);color:var(--cyan2)}
+    .panel-body{flex:1;padding:14px 16px;overflow-y:auto;min-height:0}
+    .panel-body::-webkit-scrollbar{width:4px}
+    .panel-body::-webkit-scrollbar-thumb{background:rgba(6,182,212,.2);border-radius:999px}
+    .left-col{display:flex;flex-direction:column;gap:12px}
+    .channel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .channel-card{background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.15);border-radius:12px;padding:14px 12px;text-align:center;cursor:pointer;transition:all .3s ease;position:relative}
+    .channel-card:hover{background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.32);transform:translateY(-2px)}
+    .channel-card.selected{background:rgba(6,182,212,.12);border-color:var(--cyan);box-shadow:0 0 16px rgba(34,211,238,.18)}
+    .channel-card.selected::after{content:"\2713";position:absolute;top:6px;right:8px;font-size:12px;color:var(--cyan2);font-weight:bold}
+    .channel-icon{font-size:28px;margin-bottom:6px}
+    .channel-name{font-size:13px;font-weight:600;color:var(--text)}
+    .channel-count{font-size:11px;color:var(--sub);margin-top:4px}
+    .area-list{list-style:none}
+    .area-list li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(6,182,212,.06);cursor:pointer;transition:all .2s ease;border-radius:8px;margin-bottom:2px}
+    .area-list li:hover{background:rgba(6,182,212,.06)}
+    .area-list li.selected{background:rgba(6,182,212,.10)}
+    .area-check{width:18px;height:18px;border:2px solid rgba(6,182,212,.35);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent;transition:all .2s ease;flex-shrink:0}
+    .area-list li.selected .area-check{background:var(--cyan);border-color:var(--cyan);color:#fff}
+    .area-name{font-size:13px;color:var(--text)}
+    .area-pop{margin-left:auto;font-size:11px;color:var(--sub)}
+    .center-col{display:flex;flex-direction:column;gap:12px}
+    .compose-area{flex:1;display:flex;flex-direction:column;gap:12px}
+    .form-row{display:flex;align-items:center;gap:12px}
+    .form-label{font-size:13px;color:var(--sub);width:70px;flex-shrink:0}
+    .form-input{flex:1;height:40px;padding:0 14px;background:rgba(0,30,70,.5);border:1px solid rgba(6,182,212,.25);border-radius:10px;color:var(--text);font-size:14px;outline:none;transition:all .3s ease}
+    .form-input:focus{border-color:var(--cyan);box-shadow:0 0 10px rgba(6,182,212,.25)}
+    .form-select{flex:1;height:40px;padding:0 12px;background:rgba(0,30,70,.5);border:1px solid rgba(6,182,212,.25);border-radius:10px;color:var(--text);font-size:14px;outline:none;cursor:pointer}
+    .level-selector{display:flex;gap:8px}
+    .level-btn{flex:1;height:36px;border:1px solid rgba(6,182,212,.20);border-radius:8px;background:rgba(255,255,255,.03);color:var(--sub);font-size:12px;font-weight:600;cursor:pointer;transition:all .3s ease}
+    .level-btn:hover{background:rgba(6,182,212,.08)}
+    .level-btn.active.blue{background:rgba(59,130,246,.2);border-color:var(--blue);color:var(--blue)}
+    .level-btn.active.yellow{background:rgba(245,158,11,.2);border-color:var(--orange);color:var(--orange)}
+    .level-btn.active.orange{background:rgba(249,115,22,.2);border-color:#F97316;color:#F97316}
+    .level-btn.active.red{background:rgba(239,68,68,.2);border-color:var(--danger);color:var(--danger)}
+    .msg-textarea{width:100%;flex:1;min-height:120px;padding:14px;background:rgba(0,30,70,.4);border:1px solid rgba(6,182,212,.20);border-radius:12px;color:var(--text);font-size:14px;line-height:1.6;outline:none;resize:none;font-family:inherit;transition:all .3s ease}
+    .msg-textarea:focus{border-color:var(--cyan);box-shadow:0 0 12px rgba(6,182,212,.18)}
+    .msg-textarea::placeholder{color:rgba(143,168,192,.5)}
+    .template-bar{display:flex;gap:8px;flex-wrap:wrap}
+    .template-btn{padding:6px 14px;border:1px solid rgba(6,182,212,.20);border-radius:8px;background:rgba(255,255,255,.03);color:var(--sub);font-size:12px;cursor:pointer;transition:all .2s ease}
+    .template-btn:hover{background:rgba(6,182,212,.08);color:var(--text)}
+    .push-actions{display:flex;gap:12px;align-items:center}
+    .push-btn{flex:1;height:48px;border:none;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all .3s ease}
+    .push-btn.primary{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;box-shadow:0 0 20px rgba(6,182,212,.30)}
+    .push-btn.primary:hover{box-shadow:0 0 30px rgba(6,182,212,.50);transform:translateY(-2px)}
+    .push-btn.secondary{background:rgba(255,255,255,.05);border:1px solid rgba(6,182,212,.25);color:var(--sub)}
+    .push-btn.secondary:hover{background:rgba(6,182,212,.08);color:var(--text)}
+
+    /* ===== SEVERITY PANEL ===== */
+    .severity-panel{
+      background:rgba(30,41,59,.92);
+      border:1px solid rgba(6,182,212,.28);
+      border-radius:16px;
+      padding:14px 16px;
+      margin-bottom:12px;
+      box-shadow:0 0 20px rgba(6,182,212,.08);
+    }
+    .severity-title{
+      font-size:13px;
+      font-weight:700;
+      color:var(--cyan2);
+      margin-bottom:10px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .severity-title .dot{width:5px;height:16px;border-radius:6px;background:linear-gradient(180deg,var(--cyan2),var(--cyan));box-shadow:0 0 12px rgba(34,211,238,.45)}
+    .severity-meter{
+      display:flex;
+      gap:4px;
+      margin-bottom:10px;
+    }
+    .severity-bar{
+      flex:1;
+      height:8px;
+      border-radius:4px;
+      background:rgba(255,255,255,.06);
+      transition:all .5s ease;
+    }
+    .severity-bar.active.blue{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+    .severity-bar.active.yellow{background:var(--orange);box-shadow:0 0 8px var(--orange)}
+    .severity-bar.active.orange{background:#F97316;box-shadow:0 0 8px #F97316}
+    .severity-bar.active.red{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+    .severity-info{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:12px;
+    }
+    .severity-label{color:var(--sub)}
+    .severity-value{font-weight:700;font-size:14px}
+    .severity-value.blue{color:var(--blue)}
+    .severity-value.yellow{color:var(--orange)}
+    .severity-value.orange{color:#F97316}
+    .severity-value.red{color:var(--danger)}
+
+    /* ===== AUTO PUSH SWITCH ===== */
+    .auto-push-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
+      background:rgba(239,68,68,.06);
+      border:1px solid rgba(239,68,68,.15);
+      border-radius:12px;
+      margin-bottom:12px;
+    }
+    .auto-push-label{font-size:13px;color:var(--text);font-weight:600}
+    .auto-push-desc{font-size:11px;color:var(--sub);margin-top:2px}
+    .switch{
+      position:relative;
+      width:44px;
+      height:24px;
+      flex-shrink:0;
+      margin-left:auto;
+    }
+    .switch input{opacity:0;width:0;height:0}
+    .switch .slider{
+      position:absolute;
+      inset:0;
+      background:rgba(255,255,255,.1);
+      border-radius:24px;
+      cursor:pointer;
+      transition:all .3s ease;
+    }
+    .switch .slider::before{
+      content:"";
+      position:absolute;
+      width:18px;height:18px;
+      left:3px;bottom:3px;
+      background:#fff;
+      border-radius:50%;
+      transition:all .3s ease;
+    }
+    .switch input:checked+.slider{background:var(--danger);box-shadow:0 0 12px rgba(239,68,68,.4)}
+    .switch input:checked+.slider::before{transform:translateX(20px)}
+    .auto-push-status{
+      font-size:11px;
+      padding:2px 10px;
+      border-radius:999px;
+      font-weight:600;
+    }
+    .auto-push-status.on{background:rgba(239,68,68,.15);color:var(--danger)}
+    .auto-push-status.off{background:rgba(255,255,255,.05);color:var(--sub)}
+
+    /* ===== BIG PUSH BUTTON ===== */
+    .big-push-btn{
+      width:100%;
+      height:64px;
+      border:none;
+      border-radius:16px;
+      font-size:20px;
+      font-weight:900;
+      letter-spacing:4px;
+      cursor:pointer;
+      transition:all .3s ease;
+      background:linear-gradient(135deg,#EF4444,#F97316,#F59E0B);
+      color:#fff;
+      box-shadow:0 0 30px rgba(239,68,68,.35);
+      position:relative;
+      overflow:hidden;
+      animation:bigPushGlow 3s ease-in-out infinite;
+    }
+    .big-push-btn::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
+      animation:bigPushShine 3s ease-in-out infinite;
+    }
+    .big-push-btn:hover{
+      box-shadow:0 0 50px rgba(239,68,68,.55);
+      transform:translateY(-3px) scale(1.02);
+    }
+    .big-push-btn:active{transform:translateY(0) scale(0.98)}
+    .big-push-btn.pushing{
+      animation:bigPushPulse 0.5s ease-in-out infinite;
+    }
+    @keyframes bigPushGlow{
+      0%,100%{box-shadow:0 0 30px rgba(239,68,68,.35)}
+      50%{box-shadow:0 0 45px rgba(239,68,68,.55)}
+    }
+    @keyframes bigPushShine{
+      0%{transform:translateX(-100%)}
+      100%{transform:translateX(100%)}
+    }
+    @keyframes bigPushPulse{
+      0%,100%{transform:scale(1)}
+      50%{transform:scale(1.03)}
+    }
+    .right-col{display:flex;flex-direction:column;gap:12px}
+    .stats-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .stat-box{background:rgba(6,182,212,.04);border:1px solid rgba(6,182,212,.12);border-radius:10px;padding:12px;text-align:center}
+    .stat-box .stat-val{font-size:22px;font-weight:800;color:var(--cyan2)}
+    .stat-box .stat-label{font-size:11px;color:var(--sub);margin-top:4px}
+    .log-list{list-style:none}
+    .log-item{padding:10px 0;border-bottom:1px solid rgba(6,182,212,.06)}
+    .log-item:last-child{border-bottom:none}
+    .log-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+    .log-level{font-size:10px;padding:1px 8px;border-radius:999px;font-weight:600}
+    .log-level.blue{background:rgba(59,130,246,.15);color:var(--blue)}
+    .log-level.yellow{background:rgba(245,158,11,.15);color:var(--orange)}
+    .log-level.orange{background:rgba(249,115,22,.15);color:#F97316}
+    .log-level.red{background:rgba(239,68,68,.15);color:var(--danger)}
+    .log-time{font-size:11px;color:var(--sub);margin-left:auto}
+    .log-title{font-size:13px;color:var(--text);margin-bottom:4px}
+    .log-meta{display:flex;gap:12px;font-size:11px;color:var(--sub)}
+    .log-status{font-size:10px;padding:1px 8px;border-radius:999px}
+    .log-status.success{background:rgba(16,185,129,.15);color:var(--green)}
+    .log-status.pending{background:rgba(245,158,11,.15);color:var(--orange)}
+    .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-100px);padding:14px 28px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;transition:transform .4s ease;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+    .toast.show{transform:translateX(-50%) translateY(0)}
+    .toast.success{background:rgba(16,185,129,.92);color:#fff}
+    .toast.error{background:rgba(239,68,68,.92);color:#fff}
+    .toast.info{background:rgba(6,182,212,.92);color:#fff}
+  </style>
+</head>
+<body>
+<div class="screen">
+  <div class="header">
+    <h1>灾擎 · 预警信息一键推送平台</h1>
+    <div class="header-right">
+      <span><i class="status-dot"></i>推送服务正常</span>
+      <span id="clock">--</span>
+      <span>广西全域</span>
+    </div>
+  </div>
+  <div class="left-col">
+    <div class="panel">
+      <div class="panel-header"><div class="dot"></div><h2>推送渠道</h2><span class="badge">已选 <span id="channelCount">0</span></span></div>
+      <div class="panel-body">
+        <div class="channel-grid">
+          <div class="channel-card selected" data-channel="sms"><div class="channel-icon">📱</div><div class="channel-name">短信推送</div><div class="channel-count">覆盖 5,200万人</div></div>
+          <div class="channel-card selected" data-channel="wechat"><div class="channel-icon">💬</div><div class="channel-name">微信推送</div><div class="channel-count">覆盖 3,800万人</div></div>
+          <div class="channel-card" data-channel="app"><div class="channel-icon">📲</div><div class="channel-name">APP推送</div><div class="channel-count">覆盖 1,200万人</div></div>
+          <div class="channel-card" data-channel="broadcast"><div class="channel-icon">📢</div><div class="channel-name">应急广播</div><div class="channel-count">覆盖 2,100万人</div></div>
+          <div class="channel-card" data-channel="email"><div class="channel-icon">📧</div><div class="channel-name">邮件推送</div><div class="channel-count">覆盖 860万人</div></div>
+          <div class="channel-card" data-channel="tv"><div class="channel-icon">📺</div><div class="channel-name">电视滚动</div><div class="channel-count">覆盖 4,500万人</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><div class="dot"></div><h2>目标区域</h2><span class="badge">已选 <span id="areaCount">0</span></span></div>
+      <div class="panel-body">
+        <ul class="area-list" id="areaList">
+          <li class="selected" data-area="南宁"><div class="area-check">✓</div><span class="area-name">南宁市</span><span class="area-pop">874万</span></li>
+          <li class="selected" data-area="柳州"><div class="area-check">✓</div><span class="area-name">柳州市</span><span class="area-pop">416万</span></li>
+          <li class="selected" data-area="桂林"><div class="area-check">✓</div><span class="area-name">桂林市</span><span class="area-pop">493万</span></li>
+          <li data-area="梧州"><div class="area-check">✓</div><span class="area-name">梧州市</span><span class="area-pop">282万</span></li>
+          <li data-area="北海"><div class="area-check">✓</div><span class="area-name">北海市</span><span class="area-pop">186万</span></li>
+          <li data-area="防城港"><div class="area-check">✓</div><span class="area-name">防城港市</span><span class="area-pop">105万</span></li>
+          <li data-area="钦州"><div class="area-check">✓</div><span class="area-name">钦州市</span><span class="area-pop">330万</span></li>
+          <li data-area="贵港"><div class="area-check">✓</div><span class="area-name">贵港市</span><span class="area-pop">432万</span></li>
+          <li data-area="玉林"><div class="area-check">✓</div><span class="area-name">玉林市</span><span class="area-pop">580万</span></li>
+          <li data-area="百色"><div class="area-check">✓</div><span class="area-name">百色市</span><span class="area-pop">358万</span></li>
+          <li data-area="贺州"><div class="area-check">✓</div><span class="area-name">贺州市</span><span class="area-pop">201万</span></li>
+          <li data-area="河池"><div class="area-check">✓</div><span class="area-name">河池市</span><span class="area-pop">349万</span></li>
+          <li data-area="来宾"><div class="area-check">✓</div><span class="area-name">来宾市</span><span class="area-pop">208万</span></li>
+          <li data-area="崇左"><div class="area-check">✓</div><span class="area-name">崇左市</span><span class="area-pop">207万</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="center-col">
+    <!-- 灾害严重程度评估 -->
+    <div class="severity-panel">
+      <div class="severity-title"><div class="dot"></div>灾害严重程度评估</div>
+      <div class="severity-meter" id="severityMeter">
+        <div class="severity-bar active blue"></div>
+        <div class="severity-bar active blue"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+        <div class="severity-bar"></div>
+      </div>
+      <div class="severity-info">
+        <span class="severity-label">当前等级</span>
+        <span class="severity-value blue" id="severityValue">蓝色 (IV级) - 一般</span>
+      </div>
+    </div>
+
+    <!-- 自动推送开关 -->
+    <div class="auto-push-row">
+      <div>
+        <div class="auto-push-label">🤖 高等级自动推送</div>
+        <div class="auto-push-desc">橙色/红色预警将自动触发全渠道推送</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="autoPushSwitch" checked>
+        <span class="slider"></span>
+      </label>
+      <span class="auto-push-status on" id="autoPushStatus">已开启</span>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><div class="dot"></div><h2>预警信息编辑</h2><span class="badge">草稿已保存</span></div>
+      <div class="panel-body compose-area">
+        <div class="form-row"><span class="form-label">预警标题</span><input class="form-input" id="alertTitle" placeholder="请输入预警标题" value="广西多地暴雨红色预警" /></div>
+        <div class="form-row"><span class="form-label">灾害类型</span><select class="form-select" id="disasterType"><option value="暴雨">暴雨</option><option value="洪涝">洪涝</option><option value="台风">台风</option><option value="山体滑坡">山体滑坡</option><option value="泥石流">泥石流</option><option value="干旱">干旱</option><option value="低温冰冻">低温冰冻</option><option value="大风">大风</option></select></div>
+        <div class="form-row"><span class="form-label">预警等级</span><div class="level-selector"><button class="level-btn blue" data-level="blue">蓝色 (IV级)</button><button class="level-btn yellow" data-level="yellow">黄色 (III级)</button><button class="level-btn orange active orange" data-level="orange">橙色 (II级)</button><button class="level-btn red" data-level="red">红色 (I级)</button></div></div>
+        <div class="form-row"><span class="form-label">有效时段</span><input class="form-input" id="validPeriod" placeholder="如：2026-06-16 08:00 至 2026-06-17 08:00" value="2026-06-16 08:00 至 2026-06-17 08:00" /></div>
+        <textarea class="msg-textarea" id="alertContent" placeholder="请输入预警内容...">【广西壮族自治区气象台】暴雨橙色预警信号：预计未来24小时，南宁、柳州、桂林、梧州、贵港、玉林、百色、河池等市的部分地区将出现大暴雨，局地特大暴雨，累计雨量100-200毫米，局地可达300毫米以上。请注意防范城乡积涝、山洪、山体滑坡、泥石流等次生灾害。请相关部门做好防御工作。</textarea>
+        <div><div style="font-size:12px;color:var(--sub);margin-bottom:8px">快速模板：</div><div class="template-bar"><button class="template-btn" data-tpl="rain">暴雨预警模板</button><button class="template-btn" data-tpl="flood">洪涝预警模板</button><button class="template-btn" data-tpl="typhoon">台风预警模板</button><button class="template-btn" data-tpl="landslide">地质灾害模板</button><button class="template-btn" data-tpl="cold">低温冰冻模板</button></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body" style="padding:12px 16px">
+        <div class="push-actions" style="margin-bottom:10px">
+          <button class="push-btn secondary" id="previewBtn">预览</button>
+          <button class="push-btn secondary" id="saveDraftBtn">保存草稿</button>
+          <button class="push-btn primary" id="pushBtn">手动推送</button>
+        </div>
+        <button class="big-push-btn" id="bigPushBtn">⚡ 一 键 推 送 ⚡</button>
+      </div>
+    </div>
+  </div>
+  <div class="right-col">
+    <div class="panel">
+      <div class="panel-header"><div class="dot"></div><h2>推送统计</h2></div>
+      <div class="panel-body">
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-val" id="totalPush">1,286</div><div class="stat-label">今日推送(次)</div></div>
+          <div class="stat-box"><div class="stat-val" id="totalReach">2.4亿</div><div class="stat-label">累计触达(人次)</div></div>
+          <div class="stat-box"><div class="stat-val" id="successRate">98.6%</div><div class="stat-label">推送成功率</div></div>
+          <div class="stat-box"><div class="stat-val" id="avgTime">3.2s</div><div class="stat-label">平均推送耗时</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="flex:1">
+      <div class="panel-header"><div class="dot"></div><h2>推送记录</h2><span class="badge">最近24小时</span></div>
+      <div class="panel-body">
+        <ul class="log-list" id="logList">
+          <li class="log-item"><div class="log-top"><span class="log-level red">红色</span><span class="log-time">10:28:15</span></div><div class="log-title">南宁暴雨红色预警</div><div class="log-meta"><span>短信+微信+APP</span><span>覆盖 874万人</span><span class="log-status success">已送达</span></div></li>
+          <li class="log-item"><div class="log-top"><span class="log-level orange">橙色</span><span class="log-time">09:45:33</span></div><div class="log-title">柳州洪涝橙色预警</div><div class="log-meta"><span>短信+广播</span><span>覆盖 416万人</span><span class="log-status success">已送达</span></div></li>
+          <li class="log-item"><div class="log-top"><span class="log-level yellow">黄色</span><span class="log-time">08:12:07</span></div><div class="log-title">桂林山体滑坡黄色预警</div><div class="log-meta"><span>短信+微信</span><span>覆盖 493万人</span><span class="log-status success">已送达</span></div></li>
+          <li class="log-item"><div class="log-top"><span class="log-level blue">蓝色</span><span class="log-time">07:30:21</span></div><div class="log-title">全区大风蓝色预警</div><div class="log-meta"><span>短信+电视</span><span>覆盖 5,200万人</span><span class="log-status success">已送达</span></div></li>
+          <li class="log-item"><div class="log-top"><span class="log-level orange">橙色</span><span class="log-time">昨日 22:15:44</span></div><div class="log-title">百色泥石流橙色预警</div><div class="log-meta"><span>短信+APP+广播</span><span>覆盖 358万人</span><span class="log-status pending">推送中</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function(){
+  function pad(n){return String(n).padStart(2,'0')}
+  function updateClock(){
+    var now=new Date();
+    document.getElementById('clock').textContent=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  }
+  updateClock();
+  setInterval(updateClock,1000);
+
+  function showToast(msg,type){
+    type=type||'info';
+    var t=document.getElementById('toast');
+    t.textContent=msg;
+    t.className='toast '+type+' show';
+    setTimeout(function(){t.classList.remove('show')},3000);
+  }
+
+  document.querySelectorAll('.channel-card').forEach(function(card){
+    card.addEventListener('click',function(){
+      card.classList.toggle('selected');
+      updateChannelCount();
+    });
+  });
+  function updateChannelCount(){
+    document.getElementById('channelCount').textContent=document.querySelectorAll('.channel-card.selected').length;
+  }
+  updateChannelCount();
+
+  document.querySelectorAll('.area-list li').forEach(function(item){
+    item.addEventListener('click',function(){
+      item.classList.toggle('selected');
+      updateAreaCount();
+    });
+  });
+  function updateAreaCount(){
+    document.getElementById('areaCount').textContent=document.querySelectorAll('.area-list li.selected').length;
+  }
+  updateAreaCount();
+
+  document.querySelectorAll('.level-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.level-btn').forEach(function(b){b.classList.remove('active')});
+      btn.classList.add('active');
+      updateSeverity(btn.getAttribute('data-level'));
+    });
+  });
+
+  // Severity meter update
+  function updateSeverity(level){
+    var bars=document.querySelectorAll('.severity-bar');
+    var valueEl=document.getElementById('severityValue');
+    var config={
+      blue:{count:2,label:'蓝色 (IV级) - 一般',cls:'blue'},
+      yellow:{count:4,label:'黄色 (III级) - 较重',cls:'yellow'},
+      orange:{count:7,label:'橙色 (II级) - 严重',cls:'orange'},
+      red:{count:10,label:'红色 (I级) - 特别严重',cls:'red'}
+    };
+    var c=config[level]||config.blue;
+    for(var i=0;i<bars.length;i++){
+      bars[i].className='severity-bar'+(i<c.count?' active '+c.cls:'');
+    }
+    valueEl.textContent=c.label;
+    valueEl.className='severity-value '+c.cls;
+
+    // Auto push check
+    var autoSwitch=document.getElementById('autoPushSwitch');
+    if(autoSwitch.checked&&(level==='orange'||level==='red')){
+      setTimeout(function(){
+        showToast('⚠️ 检测到'+c.label+'，自动推送已触发！','error');
+        doPush(true);
+      },1500);
+    }
+  }
+
+  // Auto push switch
+  document.getElementById('autoPushSwitch').addEventListener('change',function(){
+    var statusEl=document.getElementById('autoPushStatus');
+    if(this.checked){
+      statusEl.textContent='已开启';
+      statusEl.className='auto-push-status on';
+    }else{
+      statusEl.textContent='已关闭';
+      statusEl.className='auto-push-status off';
+    }
+  });
+
+  // Initialize severity
+  updateSeverity('orange');
+
+  var templates={
+    rain:'【广西壮族自治区气象台】暴雨预警信号：预计未来24小时，部分地区将出现大暴雨，累计雨量100-200毫米，局地可达300毫米以上。请注意防范城乡积涝、山洪、山体滑坡、泥石流等次生灾害。',
+    flood:'【广西壮族自治区水利厅】洪涝预警：受连续强降雨影响，部分河流水位持续上涨，预计未来12小时将出现超警戒水位。请沿岸居民做好转移准备，相关部门加强巡堤查险。',
+    typhoon:'【广西壮族自治区气象台】台风预警：今年第X号台风预计将于未来48小时内影响我区，中心附近最大风力X级。请海上作业船只回港避风，沿海地区做好防风准备。',
+    landslide:'【广西壮族自治区自然资源厅】地质灾害气象风险预警：受持续降雨影响，部分地区发生山体滑坡、泥石流等地质灾害的风险较高。请山区居民注意避让，加强巡查监测。',
+    cold:'【广西壮族自治区气象台】低温冰冻预警：受强冷空气影响，预计未来48小时我区大部地区气温将下降8-12℃，高寒山区可能出现道路结冰。请注意防寒保暖和交通安全。'
+  };
+  document.querySelectorAll('.template-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var tpl=templates[btn.getAttribute('data-tpl')];
+      if(tpl){document.getElementById('alertContent').value=tpl;showToast('模板已加载','info')}
+    });
+  });
+
+  document.getElementById('previewBtn').addEventListener('click',function(){
+    var title=document.getElementById('alertTitle').value;
+    var content=document.getElementById('alertContent').value;
+    if(!title||!content){showToast('请填写标题和内容','error');return}
+    showToast('预览：'+title,'info');
+  });
+
+  document.getElementById('saveDraftBtn').addEventListener('click',function(){
+    showToast('草稿已保存','success');
+  });
+
+  document.getElementById('pushBtn').addEventListener('click',function(){
+    doPush(false);
+  });
+
+  document.getElementById('bigPushBtn').addEventListener('click',function(){
+    var btn=this;
+    btn.classList.add('pushing');
+    btn.textContent='⚡ 推 送 中... ⚡';
+    setTimeout(function(){
+      doPush(false);
+      btn.classList.remove('pushing');
+      btn.textContent=' 一 键 推 送 ';
+    },800);
+  });
+
+  function doPush(isAuto){
+    var title=document.getElementById('alertTitle').value;
+    var content=document.getElementById('alertContent').value;
+    var channels=document.querySelectorAll('.channel-card.selected');
+    var areas=document.querySelectorAll('.area-list li.selected');
+    if(!title){showToast('请填写预警标题','error');return}
+    if(!content){showToast('请填写预警内容','error');return}
+
+    // Auto push: force all channels and all areas
+    if(isAuto){
+      document.querySelectorAll('.channel-card').forEach(function(c){c.classList.add('selected')});
+      document.querySelectorAll('.area-list li').forEach(function(a){a.classList.add('selected')});
+      channels=document.querySelectorAll('.channel-card.selected');
+      areas=document.querySelectorAll('.area-list li.selected');
+      updateChannelCount();
+      updateAreaCount();
+    }
+
+    if(channels.length===0){showToast('请至少选择一个推送渠道','error');return}
+    if(areas.length===0){showToast('请至少选择一个目标区域','error');return}
+
+    var levelBtn=document.querySelector('.level-btn.active');
+    var levelText=levelBtn?levelBtn.textContent.trim().split(' ')[0]:'未知';
+    var levelClass=levelBtn?levelBtn.getAttribute('data-level'):'blue';
+    var channelNames=[];
+    for(var i=0;i<channels.length;i++){channelNames.push(channels[i].querySelector('.channel-name').textContent)}
+    var totalPop=0;
+    for(var j=0;j<areas.length;j++){var pop=parseInt(areas[j].querySelector('.area-pop').textContent);if(!isNaN(pop))totalPop+=pop}
+
+    var now=new Date();
+    var timeStr=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+
+    var li=document.createElement('li');
+    li.className='log-item';
+    var autoTag=isAuto?' <span style="background:rgba(239,68,68,.15);color:#EF4444;padding:1px 6px;border-radius:999px;font-size:9px">自动</span>':'';
+    li.innerHTML='<div class="log-top"><span class="log-level '+levelClass+'">'+levelText+'</span><span class="log-time">'+timeStr+'</span></div><div class="log-title">'+title+autoTag+'</div><div class="log-meta"><span>'+channelNames.join('+')+'</span><span>覆盖 '+totalPop+'万人</span><span class="log-status pending">推送中</span></div>';
+
+    var logList=document.getElementById('logList');
+    logList.insertBefore(li,logList.firstChild);
+
+    var totalPushEl=document.getElementById('totalPush');
+    var current=parseInt(totalPushEl.textContent.replace(/,/g,''));
+    totalPushEl.textContent=(current+1).toLocaleString();
+
+    var msg=isAuto?'🤖 自动推送成功！全渠道已发送至 '+areas.length+' 个区域':'推送成功！已发送至 '+areas.length+' 个区域，'+channels.length+' 个渠道';
+    showToast(msg,'success');
+  }
+})();
+</script>
+</body>
+</html>

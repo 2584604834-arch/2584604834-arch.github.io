@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灾擎 - 分级预警指挥中心</title>
+  <style>
+    :root{
+      --bg:#0F172A;
+      --panel:#1E293B;
+      --panel-2:#162235;
+      --border:#06B6D4;
+      --text:#E5F3FF;
+      --sub:#94A3B8;
+
+      --blue:#3B82F6;
+      --yellow:#F59E0B;
+      --orange:#F97316;
+      --red:#EF4444;
+      --green:#10B981;
+      --cyan:#22D3EE;
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:var(--bg);
+      color:var(--text);
+      font-family:"Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif;
+    }
+
+    body{
+      position:relative;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(6,182,212,.14), transparent 22%),
+        radial-gradient(circle at 82% 14%, rgba(59,130,246,.10), transparent 20%),
+        radial-gradient(circle at 78% 78%, rgba(239,68,68,.08), transparent 24%),
+        linear-gradient(180deg, #0B1220 0%, #0F172A 45%, #0B1324 100%);
+    }
+
+    /* 粒子与扫描线 */
+    body::before,body::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+    body::before{
+      background-image:
+        radial-gradient(circle, rgba(34,211,238,.28) 1px, transparent 1.6px),
+        radial-gradient(circle, rgba(59,130,246,.18) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(255,255,255,.08) 1px, transparent 1.5px);
+      background-size: 120px 120px, 180px 180px, 230px 230px;
+      background-position: 0 0, 40px 60px, 100px 40px;
+      opacity:.35;
+      animation: dotsMove 18s linear infinite;
+    }
+    body::after{
+      background:
+        linear-gradient(180deg, transparent 0%, rgba(34,211,238,.05) 45%, transparent 100%);
+      animation: scan 6s linear infinite;
+      opacity:.65;
+    }
+    @keyframes dotsMove{from{transform:translateY(0)}to{transform:translateY(22px)}}
+    @keyframes scan{
+      0%{transform:translateY(-20%)}
+      100%{transform:translateY(20%)}
+    }
+
+    .screen{
+      position:relative;
+      z-index:1;
+      width:100vw;
+      height:100vh;
+      padding:12px;
+      display:grid;
+      grid-template-columns: 20% 52% 28%;
+      grid-template-rows: 10% 48% 42%;
+      gap:12px;
+    }
+
+    .panel{
+      position:relative;
+      background:
+        linear-gradient(180deg, rgba(30,41,59,.96), rgba(22,34,53,.95));
+      border:1px solid rgba(6,182,212,.35);
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:
+        inset 0 0 0 1px rgba(6,182,212,.08),
+        0 0 24px rgba(6,182,212,.08),
+        inset 0 0 32px rgba(6,182,212,.04);
+    }
+    .panel::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius:16px;
+      pointer-events:none;
+      background:
+        linear-gradient(90deg, rgba(6,182,212,.10), transparent 12%, transparent 88%, rgba(6,182,212,.10)),
+        linear-gradient(180deg, rgba(6,182,212,.10), transparent 16%, transparent 84%, rgba(6,182,212,.10));
+    }
+
+    .panel-head{
+      height:52px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 16px;
+      border-bottom:1px solid rgba(6,182,212,.12);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+    }
+    .panel-head h3{
+      margin:0;
+      font-size:16px;
+      font-weight:700;
+      letter-spacing:.5px;
+      color:#F3FAFF;
+    }
+    .panel-head .en{
+      font-size:11px;
+      color:#72D8EB;
+      letter-spacing:1px;
+      text-transform:uppercase;
+    }
+
+    /* 顶部 */
+    .topbar{
+      grid-column:1 / 4;
+      display:grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items:center;
+      padding:0 18px;
+      background:
+        linear-gradient(180deg, rgba(20,31,48,.95), rgba(15,23,42,.82));
+      border:1px solid rgba(6,182,212,.32);
+      border-radius:16px;
+      box-shadow:0 0 24px rgba(6,182,212,.10), inset 0 0 20px rgba(6,182,212,.04);
+      position:relative;
+      overflow:hidden;
+    }
+    .topbar::before{
+      content:"";
+      position:absolute;
+      left:0;right:0;top:0;
+      height:2px;
+      background:linear-gradient(90deg, transparent, rgba(34,211,238,.88), transparent);
+      animation: topGlow 5s linear infinite;
+    }
+    @keyframes topGlow{
+      0%{transform:translateX(-30%)}
+      100%{transform:translateX(30%)}
+    }
+
+    .sys-left,.sys-right{
+      display:flex;
+      align-items:center;
+      gap:16px;
+      font-size:12px;
+      color:var(--sub);
+      white-space:nowrap;
+    }
+    .status-dot{
+      width:9px;height:9px;border-radius:50%;
+      display:inline-block;margin-right:6px;
+      background:var(--green);
+      box-shadow:0 0 10px var(--green);
+    }
+    .main-title{
+      text-align:center;
+      line-height:1.2;
+    }
+    .main-title h1{
+      margin:0;
+      font-size:30px;
+      letter-spacing:3px;
+      color:#F9FCFF;
+      text-shadow:0 0 18px rgba(34,211,238,.18);
+    }
+    .main-title .sub{
+      margin-top:4px;
+      font-size:12px;
+      color:#A5E7F3;
+      letter-spacing:1px;
+    }
+
+    /* 左侧预警灯 */
+    .left-warning{
+      grid-column:1;
+      grid-row:2 / 4;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .warning-list{
+      padding:14px;
+      display:grid;
+      grid-template-rows:repeat(4,1fr);
+      gap:14px;
+      height:calc(100% - 52px);
+    }
+    .warning-item{
+      display:grid;
+      grid-template-columns:72px 1fr auto;
+      align-items:center;
+      gap:12px;
+      padding:14px;
+      border-radius:14px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.05);
+      min-height:120px;
+    }
+
+    .lamp{
+      width:56px;height:56px;border-radius:50%;
+      position:relative;
+      margin:auto;
+    }
+    .lamp::before{
+      content:"";
+      position:absolute;
+      inset:-12px;
+      border-radius:50%;
+      filter:blur(10px);
+      opacity:.5;
+    }
+    .lamp::after{
+      content:"";
+      position:absolute;
+      inset:8px;
+      border-radius:50%;
+      background:rgba(255,255,255,.18);
+      filter:blur(3px);
+    }
+
+    .blue .lamp{
+      background:radial-gradient(circle at 35% 30%, #B9DAFF, var(--blue) 56%, #0D3B8A 100%);
+      box-shadow:0 0 18px rgba(59,130,246,.9), 0 0 42px rgba(59,130,246,.36);
+    }
+    .blue .lamp::before{background:rgba(59,130,246,.68)}
+
+    .yellow .lamp{
+      background:radial-gradient(circle at 35% 30%, #FFF1B8, var(--yellow) 56%, #8A540A 100%);
+      box-shadow:0 0 18px rgba(245,158,11,.9), 0 0 42px rgba(245,158,11,.36);
+    }
+    .yellow .lamp::before{background:rgba(245,158,11,.66)}
+
+    .orange .lamp{
+      background:radial-gradient(circle at 35% 30%, #FFD5B6, var(--orange) 56%, #8A3D10 100%);
+      box-shadow:0 0 18px rgba(249,115,22,.94), 0 0 46px rgba(249,115,22,.4);
+    }
+    .orange .lamp::before{background:rgba(249,115,22,.70)}
+
+    .red .lamp{
+      background:radial-gradient(circle at 35% 30%, #FFC4CB, var(--red) 56%, #7A0D1A 100%);
+      box-shadow:0 0 22px rgba(239,68,68,1), 0 0 54px rgba(239,68,68,.55);
+      animation:redPulse 1.8s infinite;
+    }
+    .red .lamp::before{background:rgba(239,68,68,.78)}
+    @keyframes redPulse{
+      0%,100%{transform:scale(1)}
+      50%{transform:scale(1.06)}
+    }
+
+    .warning-info .name{
+      font-size:18px;
+      font-weight:800;
+      margin-bottom:6px;
+    }
+    .warning-info .desc{
+      font-size:12px;
+      color:var(--sub);
+      line-height:1.55;
+    }
+    .warning-tag{
+      font-size:12px;
+      padding:5px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      color:#D7EEFF;
+      white-space:nowrap;
+    }
+
+    /* 中上阈值设置 */
+    .threshold{
+      grid-column:2;
+      grid-row:2;
+      display:flex;
+      flex-direction:column;
+    }
+    .threshold-body{
+      padding:14px 16px 12px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px 16px;
+      align-content:start;
+      height:100%;
+    }
+    .slider-card{
+      padding:12px;
+      border-radius:12px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.05);
+      min-height:82px;
+    }
+    .slider-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:10px;
+      font-size:13px;
+    }
+    .slider-top .name{font-weight:600;color:#EAF7FF}
+    .slider-top .value{
+      font-weight:800;
+      color:#67E8F9;
+      text-shadow:0 0 8px rgba(34,211,238,.22);
+    }
+
+    input[type=range]{
+      -webkit-appearance:none;
+      width:100%;
+      height:6px;
+      border-radius:999px;
+      outline:none;
+      background:linear-gradient(90deg, rgba(59,130,246,.85), rgba(34,211,238,.9));
+    }
+    input[type=range]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width:18px;height:18px;border-radius:50%;
+      background:#E7FBFF;
+      border:2px solid #06B6D4;
+      box-shadow:0 0 12px rgba(34,211,238,.45);
+      cursor:pointer;
+    }
+
+    .threshold-kpis{
+      grid-column:1 / 3;
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:12px;
+      margin-top:2px;
+    }
+    .kpi{
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(255,255,255,.03);
+      border:1px solid rgba(6,182,212,.14);
+    }
+    .kpi .k{font-size:12px;color:var(--sub);margin-bottom:4px}
+    .kpi .v{font-size:20px;font-weight:800;color:#F8FDFF}
+
+    /* 中下：流程图+左下倒计时 */
+    .center-bottom{
+      grid-column:2;
+      grid-row:3;
+      display:grid;
+      grid-template-columns: 64% 36%;
+      gap:12px;
+      background:transparent;
+      border:none;
+      box-shadow:none;
+    }
+
+    .flow-panel{
+      display:flex;
+      flex-direction:column;
+    }
+    .flow-body{
+      position:relative;
+      height:calc(100% - 52px);
+      padding:16px;
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:10px;
+      align-items:center;
+    }
+    .flow-step{
+      height:125px;
+      border-radius:14px;
+      border:1px solid rgba(6,182,212,.22);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      box-shadow:inset 0 0 18px rgba(6,182,212,.04);
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+      padding:10px;
+      position:relative;
+      z-index:2;
+    }
+    .flow-step .icon{
+      font-size:24px;
+      margin-bottom:8px;
+      filter:drop-shadow(0 0 10px rgba(34,211,238,.2));
+    }
+    .flow-step .title{
+      font-size:15px;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    .flow-step .text{
+      font-size:11px;
+      line-height:1.45;
+      color:var(--sub);
+    }
+
+    .flow-arrow{
+      position:absolute;
+      top:50%;
+      height:2px;
+      width:42px;
+      background:linear-gradient(90deg, rgba(34,211,238,.25), rgba(34,211,238,.95));
+      transform:translateY(-50%);
+      z-index:1;
+      box-shadow:0 0 10px rgba(34,211,238,.22);
+    }
+    .flow-arrow::after{
+      content:"";
+      position:absolute;
+      right:-1px;top:50%;
+      transform:translateY(-50%);
+      border-left:8px solid rgba(34,211,238,.95);
+      border-top:5px solid transparent;
+      border-bottom:5px solid transparent;
+    }
+
+    .count-panel{
+      display:flex;
+      flex-direction:column;
+    }
+    .count-body{
+      height:calc(100% - 52px);
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      gap:12px;
+    }
+    .count-tip{
+      font-size:13px;
+      color:var(--sub);
+    }
+    .count-num{
+      font-size:48px;
+      font-weight:900;
+      line-height:1;
+      color:#FFCDD2;
+      letter-spacing:2px;
+      text-shadow:0 0 12px rgba(239,68,68,.38), 0 0 24px rgba(239,68,68,.22);
+      font-family:Arial, sans-serif;
+    }
+    .count-state{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(239,68,68,.28);
+      background:rgba(239,68,68,.08);
+      color:#FFB4BE;
+      font-size:12px;
+    }
+    .mini-note{
+      font-size:11px;
+      color:#7891A9;
+      text-align:center;
+      line-height:1.5;
+    }
+
+    /* 右侧：灾害类型 + 右下 */
+    .right-top{
+      grid-column:3;
+      grid-row:2;
+      display:flex;
+      flex-direction:column;
+    }
+    .hazard-grid{
+      padding:12px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      height:calc(100% - 52px);
+    }
+    .hazard{
+      position:relative;
+      border-radius:14px;
+      padding:12px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.05);
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      min-height:120px;
+      overflow:hidden;
+    }
+    .hazard::before{
+      content:"";
+      position:absolute;
+      right:-18px;top:-18px;
+      width:72px;height:72px;border-radius:50%;
+      background:radial-gradient(circle, rgba(34,211,238,.12), transparent 70%);
+    }
+    .hazard-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      margin-bottom:10px;
+    }
+    .hazard-name{font-size:15px;font-weight:700}
+    .hazard-sub{font-size:12px;color:var(--sub);margin-top:4px}
+    .hazard-icon{
+      font-size:22px;
+      filter:drop-shadow(0 0 8px rgba(34,211,238,.18));
+    }
+    .tag{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      width:max-content;
+      margin-top:8px;
+    }
+    .tag.blue{background:rgba(59,130,246,.14);color:#9EC8FF;border:1px solid rgba(59,130,246,.24)}
+    .tag.yellow{background:rgba(245,158,11,.14);color:#FFD58A;border:1px solid rgba(245,158,11,.24)}
+    .tag.orange{background:rgba(249,115,22,.14);color:#FFC09A;border:1px solid rgba(249,115,22,.24)}
+    .tag.red{background:rgba(239,68,68,.14);color:#FFB3BA;border:1px solid rgba(239,68,68,.24)}
+
+    .bar{
+      width:100%;
+      height:8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      overflow:hidden;
+      margin-top:10px;
+    }
+    .bar span{
+      display:block;
+      height:100%;
+      border-radius:999px;
+      box-shadow:0 0 12px rgba(255,255,255,.12);
+    }
+
+    .right-bottom{
+      grid-column:3;
+      grid-row:3;
+      display:grid;
+      grid-template-rows: 42% 58%;
+      gap:12px;
+      background:transparent;
+      border:none;
+      box-shadow:none;
+    }
+
+    .match-panel,.history-panel{
+      display:flex;
+      flex-direction:column;
+    }
+    .match-body{
+      height:calc(100% - 52px);
+      padding:14px;
+    }
+    .match-main{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    .match-name{font-size:15px;font-weight:700}
+    .match-percent{
+      font-size:30px;
+      font-weight:900;
+      color:#67E8F9;
+      text-shadow:0 0 10px rgba(34,211,238,.18);
+    }
+    .progress{
+      height:12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.05);
+      margin-bottom:12px;
+    }
+    .progress span{
+      display:block;
+      height:100%;
+      width:88%;
+      background:linear-gradient(90deg, #06B6D4, #22D3EE, #7DD3FC);
+      border-radius:999px;
+      box-shadow:0 0 14px rgba(34,211,238,.35);
+    }
+    .plan-tags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .plan-tags span{
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:12px;
+      color:#D7F5FF;
+      background:rgba(34,211,238,.08);
+      border:1px solid rgba(34,211,238,.14);
+    }
+
+    .history-body{
+      height:calc(100% - 52px);
+      padding:10px 12px 12px;
+      overflow:hidden;
+    }
+    .history-list{
+      height:100%;
+      overflow:auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding-right:4px;
+    }
+    .history-list::-webkit-scrollbar{width:6px}
+    .history-list::-webkit-scrollbar-thumb{
+      background:rgba(148,163,184,.3);
+      border-radius:999px;
+    }
+    .history-item{
+      display:grid;
+      grid-template-columns:72px 1fr auto;
+      align-items:center;
+      gap:10px;
+      padding:8px 10px;
+      border-radius:10px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.045);
+      font-size:12px;
+    }
+    .history-time{color:#8FB4CA}
+    .history-text{color:#E6F5FF}
+    .history-level{
+      font-weight:800;
+      padding:3px 8px;
+      border-radius:999px;
+    }
+    .level-blue{color:#9EC8FF;background:rgba(59,130,246,.12)}
+    .level-yellow{color:#FFD58A;background:rgba(245,158,11,.12)}
+    .level-orange{color:#FFC09A;background:rgba(249,115,22,.12)}
+    .level-red{color:#FFB3BA;background:rgba(239,68,68,.12)}
+
+    @media (max-width:1600px){
+      .main-title h1{font-size:26px}
+      .count-num{font-size:40px}
+      .flow-step{height:112px}
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <!-- 顶部 -->
+    <div class="topbar">
+      <div class="sys-left">
+        <span><i class="status-dot"></i>系统运行正常</span>
+        <span>平台编号：DQ-EWS-04</span>
+        <span>值班模式：一级响应</span>
+      </div>
+
+      <div class="main-title">
+        <h1>分级预警指挥中心</h1>
+        <div class="sub">“灾擎”系统 · Hierarchical Early Warning Command Center</div>
+      </div>
+
+      <div class="sys-right">
+        <span id="currentTime">2026-06-03 14:32:18</span>
+        <span>联动单位：12</span>
+        <span>在线节点：248</span>
+      </div>
+    </div>
+
+    <!-- 左侧四级预警 -->
+    <div class="panel left-warning">
+      <div class="panel-head">
+        <h3>四级预警指示</h3>
+        <div class="en">Warning Levels</div>
+      </div>
+      <div class="warning-list">
+        <div class="warning-item blue">
+          <div class="lamp"></div>
+          <div class="warning-info">
+            <div class="name" style="color:#9EC8FF;">蓝色预警</div>
+            <div class="desc">一般风险，启动监测关注与值守提醒，做好资源准备。</div>
+          </div>
+          <div class="warning-tag">已启用</div>
+        </div>
+
+        <div class="warning-item yellow">
+          <div class="lamp"></div>
+          <div class="warning-info">
+            <div class="name" style="color:#FFD58A;">黄色预警</div>
+            <div class="desc">较重风险，加强重点区域巡查与部门联动，预案待命。</div>
+          </div>
+          <div class="warning-tag">已启用</div>
+        </div>
+
+        <div class="warning-item orange">
+          <div class="lamp"></div>
+          <div class="warning-info">
+            <div class="name" style="color:#FFC09A;">橙色预警</div>
+            <div class="desc">严重风险，执行强化布控与应急资源前置部署。</div>
+          </div>
+          <div class="warning-tag">重点关注</div>
+        </div>
+
+        <div class="warning-item red">
+          <div class="lamp"></div>
+          <div class="warning-info">
+            <div class="name" style="color:#FFB3BA;">红色预警</div>
+            <div class="desc">特别严重风险，触发最高等级联动响应，实施现场处置。</div>
+          </div>
+          <div class="warning-tag">当前主警</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中上阈值设置 -->
+    <div class="panel threshold">
+      <div class="panel-head">
+        <h3>预警阈值设置面板</h3>
+        <div class="en">Threshold Configuration</div>
+      </div>
+      <div class="threshold-body">
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">洪涝风险阈值</span>
+            <span class="value" id="v1">76</span>
+          </div>
+          <input id="r1" type="range" min="0" max="100" value="76">
+        </div>
+
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">火灾风险阈值</span>
+            <span class="value" id="v2">58</span>
+          </div>
+          <input id="r2" type="range" min="0" max="100" value="58">
+        </div>
+
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">地震触发阈值</span>
+            <span class="value" id="v3">42</span>
+          </div>
+          <input id="r3" type="range" min="0" max="100" value="42">
+        </div>
+
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">台风风速阈值</span>
+            <span class="value" id="v4">81</span>
+          </div>
+          <input id="r4" type="range" min="0" max="100" value="81">
+        </div>
+
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">滑坡敏感阈值</span>
+            <span class="value" id="v5">69</span>
+          </div>
+          <input id="r5" type="range" min="0" max="100" value="69">
+        </div>
+
+        <div class="slider-card">
+          <div class="slider-top">
+            <span class="name">泥石流强度阈值</span>
+            <span class="value" id="v6">73</span>
+          </div>
+          <input id="r6" type="range" min="0" max="100" value="73">
+        </div>
+
+        <div class="threshold-kpis">
+          <div class="kpi">
+            <div class="k">当前预警等级</div>
+            <div class="v" style="color:#FFB3BA;">红色</div>
+          </div>
+          <div class="kpi">
+            <div class="k">触发规则数</div>
+            <div class="v">24</div>
+          </div>
+          <div class="kpi">
+            <div class="k">风险因子联动</div>
+            <div class="v">6类</div>
+          </div>
+          <div class="kpi">
+            <div class="k">自动推送成功率</div>
+            <div class="v">98.6%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中下：流程图 + 左下倒计时 -->
+    <div class="center-bottom">
+      <div class="panel flow-panel">
+        <div class="panel-head">
+          <h3>预警触发机制流程图</h3>
+          <div class="en">Trigger Workflow</div>
+        </div>
+        <div class="flow-body">
+          <div class="flow-step">
+            <div class="icon">📡</div>
+            <div class="title">监测感知</div>
+            <div class="text">接入多源数据<br>实时采集环境与灾情信号</div>
+          </div>
+
+          <div class="flow-step">
+            <div class="icon">🧮</div>
+            <div class="title">阈值比对</div>
+            <div class="text">规则引擎执行<br>关键指标越限判定</div>
+          </div>
+
+          <div class="flow-step">
+            <div class="icon">⚠️</div>
+            <div class="title">等级研判</div>
+            <div class="text">计算预警等级<br>生成区域风险结论</div>
+          </div>
+
+          <div class="flow-step">
+            <div class="icon">📨</div>
+            <div class="title">联动发布</div>
+            <div class="text">向部门与终端<br>推送分级预警信息</div>
+          </div>
+
+          <div class="flow-step">
+            <div class="icon">🚨</div>
+            <div class="title">应急响应</div>
+            <div class="text">自动匹配预案<br>启动指挥调度与处置</div>
+          </div>
+
+          <div class="flow-arrow" style="left:18.4%;"></div>
+          <div class="flow-arrow" style="left:38.5%;"></div>
+          <div class="flow-arrow" style="left:58.7%;"></div>
+          <div class="flow-arrow" style="left:78.8%; width:34px;"></div>
+        </div>
+      </div>
+
+      <div class="panel count-panel">
+        <div class="panel-head">
+          <h3>预警倒计时</h3>
+          <div class="en">Countdown</div>
+        </div>
+        <div class="count-body">
+          <div class="count-tip">距离下一轮研判触发</div>
+          <div class="count-num" id="countdown">00:14:59</div>
+          <div class="count-state">红色预警联动中</div>
+          <div class="mini-note">系统每 15 分钟滚动更新一次综合预警结论</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右上：6类灾害 -->
+    <div class="panel right-top">
+      <div class="panel-head">
+        <h3>灾害类型预警面板</h3>
+        <div class="en">Disaster Alerts</div>
+      </div>
+      <div class="hazard-grid">
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">洪涝</div>
+                <div class="hazard-sub">流域水位快速抬升</div>
+              </div>
+              <div class="hazard-icon">🌊</div>
+            </div>
+            <div class="tag red">红色预警</div>
+          </div>
+          <div class="bar"><span style="width:92%; background:linear-gradient(90deg,#EF4444,#FB7185);"></span></div>
+        </div>
+
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">火灾</div>
+                <div class="hazard-sub">局部热源异常波动</div>
+              </div>
+              <div class="hazard-icon">🔥</div>
+            </div>
+            <div class="tag yellow">黄色预警</div>
+          </div>
+          <div class="bar"><span style="width:57%; background:linear-gradient(90deg,#F59E0B,#FCD34D);"></span></div>
+        </div>
+
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">地震</div>
+                <div class="hazard-sub">地震台网平稳运行</div>
+              </div>
+              <div class="hazard-icon">🫨</div>
+            </div>
+            <div class="tag blue">蓝色预警</div>
+          </div>
+          <div class="bar"><span style="width:34%; background:linear-gradient(90deg,#3B82F6,#60A5FA);"></span></div>
+        </div>
+
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">台风</div>
+                <div class="hazard-sub">外围风圈持续增强</div>
+              </div>
+              <div class="hazard-icon">🌀</div>
+            </div>
+            <div class="tag orange">橙色预警</div>
+          </div>
+          <div class="bar"><span style="width:76%; background:linear-gradient(90deg,#F97316,#FB923C);"></span></div>
+        </div>
+
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">滑坡</div>
+                <div class="hazard-sub">山体含水率持续升高</div>
+              </div>
+              <div class="hazard-icon">⛰️</div>
+            </div>
+            <div class="tag orange">橙色预警</div>
+          </div>
+          <div class="bar"><span style="width:71%; background:linear-gradient(90deg,#F97316,#FDBA74);"></span></div>
+        </div>
+
+        <div class="hazard">
+          <div>
+            <div class="hazard-top">
+              <div>
+                <div class="hazard-name">泥石流</div>
+                <div class="hazard-sub">沟谷泥沙输移增强</div>
+              </div>
+              <div class="hazard-icon">🏔️</div>
+            </div>
+            <div class="tag red">红色预警</div>
+          </div>
+          <div class="bar"><span style="width:88%; background:linear-gradient(90deg,#EF4444,#F87171);"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右下：预案匹配 + 历史 -->
+    <div class="right-bottom">
+      <div class="panel match-panel">
+        <div class="panel-head">
+          <h3>应急预案匹配</h3>
+          <div class="en">Emergency Plan Match</div>
+        </div>
+        <div class="match-body">
+          <div class="match-main">
+            <div class="match-name">山洪-滑坡联合处置预案</div>
+            <div class="match-percent">88%</div>
+          </div>
+          <div class="progress"><span></span></div>
+          <div class="plan-tags">
+            <span>人员转移</span>
+            <span>监测加密</span>
+            <span>道路管控</span>
+            <span>抢险物资前置</span>
+            <span>临时安置</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel history-panel">
+        <div class="panel-head">
+          <h3>预警历史记录</h3>
+          <div class="en">History</div>
+        </div>
+        <div class="history-body">
+          <div class="history-list">
+            <div class="history-item">
+              <div class="history-time">14:20:31</div>
+              <div class="history-text">洪涝风险升级，流域站点触发联动阈值</div>
+              <div class="history-level level-red">红色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">14:05:12</div>
+              <div class="history-text">泥石流监测因子快速抬升，进入重点监视</div>
+              <div class="history-level level-red">红色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">13:46:08</div>
+              <div class="history-text">台风外围风圈增强，海岸区域转橙色预警</div>
+              <div class="history-level level-orange">橙色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">13:22:45</div>
+              <div class="history-text">滑坡敏感点位土壤含水率越阈</div>
+              <div class="history-level level-orange">橙色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">12:58:09</div>
+              <div class="history-text">火险指数波动上升，启动黄色提醒</div>
+              <div class="history-level level-yellow">黄色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">12:40:16</div>
+              <div class="history-text">地震台网检测稳定，维持蓝色关注</div>
+              <div class="history-level level-blue">蓝色</div>
+            </div>
+            <div class="history-item">
+              <div class="history-time">12:18:34</div>
+              <div class="history-text">洪涝监测数据回落，维持高警戒观察</div>
+              <div class="history-level level-orange">橙色</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 实时时间
+    function updateCurrentTime(){
+      const now = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      document.getElementById('currentTime').textContent =
+        `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
+        `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+    updateCurrentTime();
+    setInterval(updateCurrentTime,1000);
+
+    // 倒计时
+    let remain = 14 * 60 + 59;
+    function updateCountdown(){
+      const pad = n => String(n).padStart(2,'0');
+      const h = Math.floor(remain / 3600);
+      const m = Math.floor((remain % 3600) / 60);
+      const s = remain % 60;
+      document.getElementById('countdown').textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+      remain--;
+      if(remain < 0) remain = 14 * 60 + 59;
+    }
+    updateCountdown();
+    setInterval(updateCountdown,1000);
+
+    // 滑块显示值
+    const ids = ['1','2','3','4','5','6'];
+    ids.forEach(i=>{
+      const range = document.getElementById('r'+i);
+      const value = document.getElementById('v'+i);
+      range.addEventListener('input',()=> value.textContent = range.value);
+    });
+  </script>
+</body>
+</html>

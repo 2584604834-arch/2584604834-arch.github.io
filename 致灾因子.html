@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>钦州市气象灾害致灾因子分析平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: default;
+        }
+
+        :root {
+            --rainfall: #00ccff;
+            --wind: #9966ff;
+            --humidity: #00ff99;
+            --soil: #ffcc00;
+            --temp: #ff6666;
+            --pressure: #3399ff;
+
+            --bg-dark: #081022;
+            --bg-card: rgba(16, 32, 64, 0.82);
+            --border-color: rgba(64, 158, 255, 0.3);
+            --text-main: #e8f3ff;
+            --text-sub: #b8c4d4;
+            --glow: 0 0 20px rgba(45, 140, 255, 0.16);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(0, 204, 255, 0.08), transparent 20%),
+                radial-gradient(circle at 80% 18%, rgba(153, 102, 255, 0.08), transparent 18%),
+                radial-gradient(circle at 50% 80%, rgba(0, 255, 153, 0.05), transparent 22%),
+                linear-gradient(135deg, #081022 0%, #0f1839 50%, #0a274d 100%);
+            color: var(--text-main);
+            position: relative;
+        }
+
+        #particleCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(rgba(0, 123, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 123, 255, 0.035) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(64,169,255,0.07) 50%, transparent 100%);
+            animation: screenSweep 8s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes screenSweep {
+            0% { transform: translateX(-30%); }
+            100% { transform: translateX(30%); }
+        }
+
+        .dashboard {
+            width: 100vw;
+            height: 100vh;
+            padding: 10px 18px 10px;
+            display: grid;
+            grid-template-rows: 32px 74px 84px 1fr 30px;
+            gap: 10px;
+        }
+
+        .warning-bar {
+            height: 32px;
+            line-height: 32px;
+            background: rgba(255, 77, 79, 0.1);
+            border: 1px solid rgba(255, 77, 79, 0.32);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 0 12px rgba(255, 77, 79, 0.06);
+        }
+
+        .warning-scroll {
+            white-space: nowrap;
+            animation: scroll 24s linear infinite;
+            color: #ff7072;
+            font-weight: 600;
+            padding-left: 100%;
+            font-size: 14px;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-160%); }
+        }
+
+        .header {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: var(--glow), inset 0 0 10px rgba(45, 140, 255, 0.05);
+            overflow: hidden;
+        }
+
+        .header::before,
+        .header::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            width: 22%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(64,169,255,0.9));
+        }
+
+        .header::before { left: 18px; }
+        .header::after {
+            right: 18px;
+            transform: scaleX(-1);
+        }
+
+        .header h1 {
+            color: #40a9ff;
+            font-size: 32px;
+            font-weight: 700;
+            text-shadow: 0 0 12px rgba(64, 169, 255, 0.45);
+            letter-spacing: 3px;
+            z-index: 2;
+        }
+
+        .header-sub {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: #88bde8;
+            opacity: 0.9;
+        }
+
+        .region-risk {
+            position: absolute;
+            top: 50%;
+            right: 18px;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 3;
+        }
+
+        .region-tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid transparent;
+        }
+
+        .risk-low {
+            background: rgba(82, 196, 26, 0.16);
+            color: #52c41a;
+            border-color: rgba(82, 196, 26, 0.25);
+        }
+
+        .risk-medium {
+            background: rgba(250, 173, 20, 0.16);
+            color: #faad14;
+            border-color: rgba(250, 173, 20, 0.25);
+        }
+
+        .risk-high {
+            background: rgba(255, 77, 79, 0.16);
+            color: #ff6b6d;
+            border-color: rgba(255, 77, 79, 0.25);
+        }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 8px;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(45, 140, 255, 0.1), inset 0 0 8px rgba(45, 140, 255, 0.05);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 25px rgba(45, 140, 255, 0.2), inset 0 0 12px rgba(45, 140, 255, 0.1);
+            border-color: rgba(64, 158, 255, 0.5);
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #40a9ff;
+            margin-bottom: 4px;
+            text-shadow: 0 0 8px rgba(64, 169, 255, 0.4);
+            line-height: 1.1;
+        }
+
+        .stat-card .label {
+            color: var(--text-sub);
+            font-size: 13px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2.1fr 1fr;
+            gap: 16px;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 12px 10px;
+            box-shadow: 0 0 15px rgba(45, 140, 255, 0.1), inset 0 0 8px rgba(45, 140, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            min-height: 0;
+        }
+
+        .chart-container.clickable {
+            cursor: pointer;
+        }
+
+        .chart-container.clickable * {
+            cursor: pointer;
+        }
+
+        .chart-container.clickable:hover {
+            transform: translateY(-2px) scale(1.01);
+            z-index: 10;
+        }
+
+        .left-column .chart-container,
+        .right-column .chart-container {
+            flex: 1;
+        }
+
+        .chart-container.rainfall.active { border-color: var(--rainfall); box-shadow: 0 0 20px rgba(0, 204, 255, 0.3); }
+        .chart-container.wind.active { border-color: var(--wind); box-shadow: 0 0 20px rgba(153, 102, 255, 0.3); }
+        .chart-container.humidity.active { border-color: var(--humidity); box-shadow: 0 0 20px rgba(0, 255, 153, 0.3); }
+        .chart-container.soil.active { border-color: var(--soil); box-shadow: 0 0 20px rgba(255, 204, 0, 0.3); }
+        .chart-container.temp.active { border-color: var(--temp); box-shadow: 0 0 20px rgba(255, 102, 102, 0.3); }
+        .chart-container.pressure.active { border-color: var(--pressure); box-shadow: 0 0 20px rgba(51, 153, 255, 0.3); }
+
+        .chart-container::before,
+        .chart-container::after,
+        .chart-container .corner-bl,
+        .chart-container .corner-br {
+            content: "";
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #40a9ff;
+            z-index: 1;
+        }
+
+        .chart-container::before {
+            top: -1px;
+            left: -1px;
+            border-right: none;
+            border-bottom: none;
+            border-radius: 6px 0 0 0;
+        }
+
+        .chart-container::after {
+            top: -1px;
+            right: -1px;
+            border-left: none;
+            border-bottom: none;
+            border-radius: 0 6px 0 0;
+        }
+
+        .chart-container .corner-bl {
+            bottom: -1px;
+            left: -1px;
+            border-right: none;
+            border-top: none;
+            border-radius: 0 0 0 6px;
+        }
+
+        .chart-container .corner-br {
+            bottom: -1px;
+            right: -1px;
+            border-left: none;
+            border-top: none;
+            border-radius: 0 0 6px 0;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-align: center;
+            text-shadow: 0 0 5px rgba(64, 169, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .chart-title.rainfall { color: var(--rainfall); }
+        .chart-title.wind { color: var(--wind); }
+        .chart-title.humidity { color: var(--humidity); }
+        .chart-title.soil { color: var(--soil); }
+        .chart-title.temp { color: var(--temp); }
+        .chart-title.pressure { color: var(--pressure); }
+
+        .main-screen {
+            flex: 1;
+            display: grid;
+            grid-template-rows: 34px 34px 1fr 84px 78px;
+            gap: 8px;
+            min-height: 0;
+            padding: 12px;
+        }
+
+        .main-screen .chart-title {
+            font-size: 20px;
+            margin-bottom: 0;
+            color: #40a9ff;
+            justify-content: center;
+        }
+
+        .time-switch {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .time-btn {
+            padding: 4px 16px;
+            background: rgba(16, 32, 64, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: #b8c4d4;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+
+        .time-btn.active {
+            background: rgba(64, 158, 255, 0.2);
+            border-color: #40a9ff;
+            color: #40a9ff;
+            box-shadow: 0 0 12px rgba(64,169,255,0.15);
+        }
+
+        .time-btn:hover {
+            border-color: #40a9ff;
+        }
+
+        .chart {
+            width: 100%;
+            height: 100%;
+        }
+
+        .factor-summary {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+        }
+
+        .factor-chip {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 8px 6px;
+            text-align: center;
+        }
+
+        .factor-chip .name {
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-bottom: 3px;
+        }
+
+        .factor-chip .num {
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .factor-chip.rainfall .num { color: var(--rainfall); }
+        .factor-chip.wind .num { color: var(--wind); }
+        .factor-chip.humidity .num { color: var(--humidity); }
+        .factor-chip.soil .num { color: var(--soil); }
+        .factor-chip.temp .num { color: var(--temp); }
+        .factor-chip.pressure .num { color: var(--pressure); }
+
+        .linkage-analysis,
+        .insight-bar {
+            background: rgba(16, 32, 64, 0.8);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #d8e8f9;
+            padding: 8px 10px;
+            overflow: hidden;
+        }
+
+        .insight-bar {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            white-space: nowrap;
+        }
+
+        .insight-item {
+            color: #9fd3ff;
+        }
+
+        .risk-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            animation: breathe 2s ease-in-out infinite;
+            border: 1px solid transparent;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.72; }
+        }
+
+        .risk-badge.risk-low {
+            background: rgba(82, 196, 26, 0.12);
+            color: #52c41a;
+            border-color: rgba(82, 196, 26, 0.2);
+        }
+
+        .risk-badge.risk-medium {
+            background: rgba(250, 173, 20, 0.12);
+            color: #faad14;
+            border-color: rgba(250, 173, 20, 0.2);
+        }
+
+        .risk-badge.risk-high {
+            background: rgba(255, 77, 79, 0.12);
+            color: #ff6b6d;
+            border-color: rgba(255, 77, 79, 0.2);
+        }
+
+        .refresh-indicator {
+            height: 30px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            font-size: 13px;
+            color: #b8c4d4;
+            padding-right: 6px;
+        }
+
+        .refresh-countdown {
+            color: #40a9ff;
+            font-weight: bold;
+            margin: 0 4px;
+        }
+    </style>
+</head>
+<body>
+<canvas id="particleCanvas"></canvas>
+
+<div class="dashboard">
+    <!-- 顶部滚动预警栏 -->
+    <div class="warning-bar">
+        <div class="warning-scroll" id="warningScroll">
+            🚨 实时预警：日降水量 85mm（超标，洪涝风险）｜平均风速 7.2m/s（接近阈值）｜大气相对湿度 82%（偏高）｜表层土壤含水量 74%（接近饱和）｜钦南区、钦州港区域高风险预警，请持续关注短时强降雨叠加效应
+        </div>
+    </div>
+
+    <!-- 标题 -->
+    <div class="header">
+        <h1>钦州市气象灾害致灾因子分析平台</h1>
+        <div class="header-sub">QINZHOU METEOROLOGICAL DISASTER-CAUSING FACTOR ANALYSIS DASHBOARD</div>
+        <div class="region-risk">
+            <div class="region-tag risk-high">钦南区 高</div>
+            <div class="region-tag risk-medium">钦北区 中</div>
+            <div class="region-tag risk-low">灵山县 低</div>
+            <div class="region-tag risk-low">浦北县 低</div>
+        </div>
+    </div>
+
+    <!-- 顶部统计 -->
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="value" id="overdueCount">1</div>
+            <div class="label">超标因子数量</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="historyMax">320mm</div>
+            <div class="label">历史最大降雨量</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="updateTime">2026-06-10 08:45</div>
+            <div class="label">数据更新时间</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="stationOnline">98.4%</div>
+            <div class="label">监测站点在线率</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="highRiskArea">2</div>
+            <div class="label">高风险区域数</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="warningLevel">III级</div>
+            <div class="label">综合预警等级</div>
+        </div>
+    </div>
+
+    <!-- 主体 -->
+    <div class="main-grid">
+        <!-- 左侧 -->
+        <div class="column left-column">
+            <div class="chart-container clickable rainfall active" data-chart="rainfall">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title rainfall">
+                    日降水量(mm)
+                    <span class="risk-badge risk-high" id="rainfallBadge">高风险</span>
+                </div>
+                <div id="rainfallChart" class="chart"></div>
+            </div>
+
+            <div class="chart-container clickable wind" data-chart="wind">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title wind">
+                    平均风速(m/s)
+                    <span class="risk-badge risk-medium" id="windBadge">中风险</span>
+                </div>
+                <div id="windChart" class="chart"></div>
+            </div>
+
+            <div class="chart-container clickable humidity" data-chart="humidity">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title humidity">
+                    大气相对湿度(%)
+                    <span class="risk-badge risk-low" id="humidityBadge">低风险</span>
+                </div>
+                <div id="humidityChart" class="chart"></div>
+            </div>
+        </div>
+
+        <!-- 中间大屏 -->
+        <div class="column center-column">
+            <div class="chart-container main-screen">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+
+                <div class="chart-title">综合致灾因子实时分析</div>
+
+                <div class="time-switch">
+                    <button class="time-btn active" data-time="today">今日</button>
+                    <button class="time-btn" data-time="7days">近7天</button>
+                    <button class="time-btn" data-time="30days">近30天</button>
+                </div>
+
+                <div id="comprehensiveChart" class="chart"></div>
+
+                <div class="factor-summary">
+                    <div class="factor-chip rainfall">
+                        <div class="name">降水量</div>
+                        <div class="num">85mm</div>
+                    </div>
+                    <div class="factor-chip wind">
+                        <div class="name">风速</div>
+                        <div class="num">7.2m/s</div>
+                    </div>
+                    <div class="factor-chip humidity">
+                        <div class="name">湿度</div>
+                        <div class="num">82%</div>
+                    </div>
+                    <div class="factor-chip soil">
+                        <div class="name">土壤含水</div>
+                        <div class="num">74%</div>
+                    </div>
+                    <div class="factor-chip temp">
+                        <div class="name">气温</div>
+                        <div class="num">28.5℃</div>
+                    </div>
+                    <div class="factor-chip pressure">
+                        <div class="name">气压</div>
+                        <div class="num">1004hPa</div>
+                    </div>
+                </div>
+
+                <div class="linkage-analysis" id="linkageAnalysis">
+                    📊 联动分析：当前日降水量（85mm）已超标，叠加大气相对湿度（82%）较高，表层土壤含水量（74%）接近饱和，钦南区与钦州港一带发生城市内涝、低洼积水及局地山洪风险明显升高；平均风速（7.2m/s）接近阈值，需防范强对流天气叠加大风影响。
+                </div>
+
+                <div class="insight-bar">
+                    <span class="insight-item">● 今日主分析横轴：按小时展示</span>
+                    <span class="insight-item">● 近7天/近30天：按日展示趋势</span>
+                    <span class="insight-item">● 点击左右因子卡片可联动切换中间主图重点</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧 -->
+        <div class="column right-column">
+            <div class="chart-container clickable soil" data-chart="soil">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title soil">
+                    表层土壤含水量(%)
+                    <span class="risk-badge risk-medium" id="soilBadge">中风险</span>
+                </div>
+                <div id="soilChart" class="chart"></div>
+            </div>
+
+            <div class="chart-container clickable temp" data-chart="temp">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title temp">
+                    日平均气温(℃)
+                    <span class="risk-badge risk-low" id="tempBadge">低风险</span>
+                </div>
+                <div id="tempChart" class="chart"></div>
+            </div>
+
+            <div class="chart-container clickable pressure" data-chart="pressure">
+                <div class="corner-bl"></div>
+                <div class="corner-br"></div>
+                <div class="chart-title pressure">
+                    平均气压(hPa)
+                    <span class="risk-badge risk-low" id="pressureBadge">低风险</span>
+                </div>
+                <div id="pressureChart" class="chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 刷新提示 -->
+    <div class="refresh-indicator">
+        数据刷新倒计时：<span class="refresh-countdown" id="refreshCountdown">60</span>秒
+    </div>
+</div>
+
+<script>
+    // =========================
+    // 粒子背景
+    // =========================
+    const canvas = document.getElementById('particleCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+
+    class Particle {
+        constructor() {
+            this.reset();
+            this.y = Math.random() * canvas.height;
+        }
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = -10;
+            this.size = Math.random() * 2 + 1;
+            this.speedY = Math.random() * 0.6 + 0.2;
+            this.alpha = Math.random() * 0.5 + 0.2;
+        }
+        update() {
+            this.y += this.speedY;
+            if (this.y > canvas.height + 10) this.reset();
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(64,169,255,${this.alpha})`;
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function initParticles() {
+        particles = [];
+        for (let i = 0; i < 70; i++) particles.push(new Particle());
+    }
+
+    function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            p.update();
+            p.draw();
+        });
+        requestAnimationFrame(animateParticles);
+    }
+
+    initParticles();
+    animateParticles();
+
+    // =========================
+    // 数据
+    // =========================
+    const hours = ['00时','01时','02时','03时','04时','05时','06时','07时','08时','09时','10时','11时','12时','13时','14时','15时','16时','17时','18时','19时','20时','21时','22时','23时'];
+    const days7 = ['06-04','06-05','06-06','06-07','06-08','06-09','06-10'];
+    const days30 = Array.from({length: 30}, (_, i) => `05-${String(i + 12).padStart(2, '0')}`);
+
+    const factorData = {
+        rainfall: {
+            name: '降水量',
+            color: '#00ccff',
+            unit: 'mm',
+            badgeId: 'rainfallBadge',
+            today: [2,1,1,0,0,2,6,10,12,8,6,4,3,5,7,9,8,6,4,3,2,2,1,3],
+            days7: [35, 48, 52, 40, 61, 72, 85],
+            days30: [12,15,18,22,20,25,32,28,26,30,38,42,36,33,29,31,40,45,47,43,50,56,62,58,55,60,64,70,78,85],
+            threshold: 80,
+            risk: '高风险'
+        },
+        wind: {
+            name: '风速',
+            color: '#9966ff',
+            unit: 'm/s',
+            badgeId: 'windBadge',
+            today: [2.5,2.8,2.6,2.4,2.2,2.3,3.2,4.5,5.8,6.1,6.6,5.9,5.2,4.8,5.1,6.0,7.2,6.8,5.7,5.1,4.6,4.0,3.6,3.2],
+            days7: [4.8, 5.1, 5.6, 5.3, 6.2, 6.7, 7.2],
+            days30: [3.1,3.4,3.0,3.8,4.1,4.6,4.9,4.5,4.2,4.8,5.1,5.4,5.0,4.7,5.3,5.6,5.8,6.0,5.7,5.5,5.9,6.1,6.3,6.0,6.2,6.5,6.7,6.6,6.9,7.2],
+            threshold: 8,
+            risk: '中风险'
+        },
+        humidity: {
+            name: '湿度',
+            color: '#00ff99',
+            unit: '%',
+            badgeId: 'humidityBadge',
+            today: [74,76,78,79,80,81,83,85,84,82,80,78,77,79,81,83,84,82,81,80,79,78,77,76],
+            days7: [76, 74, 78, 80, 79, 81, 82],
+            days30: [68,69,70,71,72,73,75,74,73,72,74,76,78,77,76,75,74,76,77,78,79,80,81,82,81,80,79,80,81,82],
+            threshold: 85,
+            risk: '低风险'
+        },
+        soil: {
+            name: '土壤含水量',
+            color: '#ffcc00',
+            unit: '%',
+            badgeId: 'soilBadge',
+            today: [61,61,62,62,63,64,65,66,67,68,69,69,70,70,71,72,73,74,74,74,75,75,74,74],
+            days7: [58, 60, 62, 65, 68, 71, 74],
+            days30: [44,45,46,47,48,49,50,51,53,54,55,56,58,57,56,58,60,62,64,65,66,67,68,69,70,71,72,73,74,74],
+            threshold: 75,
+            risk: '中风险'
+        },
+        temp: {
+            name: '气温',
+            color: '#ff6666',
+            unit: '℃',
+            badgeId: 'tempBadge',
+            today: [24.1,23.8,23.5,23.2,23.0,23.6,24.8,26.1,27.5,28.3,29.1,29.6,30.2,30.5,30.1,29.8,29.2,28.7,28.1,27.6,27.0,26.3,25.5,24.8],
+            days7: [27.1, 27.4, 28.0, 27.8, 28.2, 28.4, 28.5],
+            days30: [25.8,26.0,26.2,26.5,26.3,26.7,27.0,27.2,27.4,27.3,27.1,27.5,27.8,27.9,28.0,28.1,28.3,28.4,28.5,28.2,28.1,27.9,28.0,28.2,28.3,28.4,28.5,28.6,28.4,28.5],
+            threshold: 35,
+            risk: '低风险'
+        },
+        pressure: {
+            name: '气压',
+            color: '#3399ff',
+            unit: 'hPa',
+            badgeId: 'pressureBadge',
+            today: [1008,1007,1007,1006,1006,1005,1005,1004,1004,1003,1003,1002,1002,1001,1001,1000,1000,1001,1002,1002,1003,1004,1005,1005],
+            days7: [1008, 1007, 1006, 1005, 1004, 1003, 1004],
+            days30: [1011,1011,1010,1010,1009,1009,1008,1008,1007,1007,1006,1006,1005,1005,1004,1004,1005,1006,1006,1007,1007,1006,1006,1005,1005,1004,1004,1003,1003,1004],
+            threshold: 995,
+            risk: '低风险'
+        }
+    };
+
+    let activeFactor = 'rainfall';
+    let activeTime = 'today';
+
+    // =========================
+    // 初始化图表
+    // =========================
+    const rainfallChart = echarts.init(document.getElementById('rainfallChart'));
+    const windChart = echarts.init(document.getElementById('windChart'));
+    const humidityChart = echarts.init(document.getElementById('humidityChart'));
+    const soilChart = echarts.init(document.getElementById('soilChart'));
+    const tempChart = echarts.init(document.getElementById('tempChart'));
+    const pressureChart = echarts.init(document.getElementById('pressureChart'));
+    const comprehensiveChart = echarts.init(document.getElementById('comprehensiveChart'));
+
+    function miniAreaOption(titleColor, data, xData, unit, threshold) {
+        return {
+            grid: { left: 36, right: 16, top: 18, bottom: 28 },
+            tooltip: { trigger: 'axis' },
+            xAxis: {
+                type: 'category',
+                data: xData,
+                axisLabel: { color: '#9ab6d3', fontSize: 10, interval: xData.length > 10 ? Math.floor(xData.length / 6) : 0 },
+                axisLine: { lineStyle: { color: 'rgba(120,160,210,0.35)' } },
+                axisTick: { show: false }
+            },
+            yAxis: {
+                type: 'value',
+                axisLabel: { color: '#9ab6d3', fontSize: 10 },
+                splitLine: { lineStyle: { color: 'rgba(120,160,210,0.12)' } },
+                axisLine: { show: false }
+            },
+            series: [
+                {
+                    type: 'line',
+                    smooth: true,
+                    symbol: 'none',
+                    data: data,
+                    lineStyle: { color: titleColor, width: 2.5 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: echarts.color.modifyAlpha(titleColor, 0.35) },
+                            { offset: 1, color: echarts.color.modifyAlpha(titleColor, 0.03) }
+                        ])
+                    },
+                    markLine: threshold ? {
+                        symbol: 'none',
+                        lineStyle: { color: '#ff7875', type: 'dashed' },
+                        label: { color: '#ffb3b1', formatter: '阈值' },
+                        data: [{ yAxis: threshold }]
+                    } : undefined
+                }
+            ]
+        };
+    }
+
+    function getComprehensiveOption(factorKey, timeKey) {
+        const factor = factorData[factorKey];
+        const xData = timeKey === 'today' ? hours : (timeKey === '7days' ? days7 : days30);
+        const data = factor[timeKey];
+
+        const allSeries = [
+            { key: 'rainfall', name: '降水量', type: 'bar', dataKey: timeKey, yAxisIndex: 0 },
+            { key: 'wind', name: '风速', type: 'line', dataKey: timeKey, yAxisIndex: 1 },
+            { key: 'humidity', name: '湿度', type: 'line', dataKey: timeKey, yAxisIndex: 2 },
+            { key: 'soil', name: '土壤含水量', type: 'line', dataKey: timeKey, yAxisIndex: 2 },
+            { key: 'temp', name: '气温', type: 'line', dataKey: timeKey, yAxisIndex: 1 },
+            { key: 'pressure', name: '气压', type: 'line', dataKey: timeKey, yAxisIndex: 3 }
+        ];
+
+        return {
+            backgroundColor: 'transparent',
+            animationDuration: 500,
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(8,16,34,0.95)',
+                borderColor: 'rgba(64,169,255,0.35)',
+                textStyle: { color: '#e8f3ff' }
+            },
+            legend: {
+                top: 4,
+                textStyle: { color: '#c9ddf2', fontSize: 12 },
+                itemWidth: 12,
+                itemHeight: 8
+            },
+            grid: { left: 48, right: 58, top: 36, bottom: 38 },
+            xAxis: {
+                type: 'category',
+                data: xData,
+                boundaryGap: timeKey === 'today',
+                axisLabel: {
+                    color: '#a8c2df',
+                    fontSize: 11,
+                    interval: timeKey === 'today' ? 1 : 'auto'
+                },
+                axisLine: { lineStyle: { color: 'rgba(120,160,210,0.35)' } },
+                axisTick: { show: false }
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '降水(mm)',
+                    nameTextStyle: { color: factorData.rainfall.color },
+                    axisLabel: { color: '#9ecfff' },
+                    splitLine: { lineStyle: { color: 'rgba(120,160,210,0.10)' } }
+                },
+                {
+                    type: 'value',
+                    name: '风速/气温',
+                    nameTextStyle: { color: '#d8c8ff' },
+                    axisLabel: { color: '#d8c8ff' },
+                    splitLine: { show: false }
+                },
+                {
+                    type: 'value',
+                    name: '湿度/土壤(%)',
+                    nameTextStyle: { color: '#9ff5c7' },
+                    axisLabel: { color: '#9ff5c7' },
+                    splitLine: { show: false }
+                },
+                {
+                    type: 'value',
+                    name: '气压',
+                    nameTextStyle: { color: '#8fc8ff' },
+                    axisLabel: { color: '#8fc8ff' },
+                    splitLine: { show: false }
+                }
+            ],
+            series: allSeries.map(item => {
+                const fd = factorData[item.key];
+                const isActive = item.key === factorKey;
+                const base = {
+                    name: item.name,
+                    yAxisIndex: item.yAxisIndex,
+                    data: fd[timeKey],
+                    emphasis: { focus: 'series' }
+                };
+
+                if (item.type === 'bar') {
+                    return {
+                        ...base,
+                        type: 'bar',
+                        barWidth: timeKey === 'today' ? '45%' : '55%',
+                        itemStyle: {
+                            color: isActive ? fd.color : 'rgba(0,204,255,0.35)',
+                            shadowBlur: isActive ? 12 : 0,
+                            shadowColor: fd.color
+                        }
+                    };
+                }
+
+                return {
+                    ...base,
+                    type: 'line',
+                    smooth: true,
+                    symbol: isActive ? 'circle' : 'none',
+                    symbolSize: isActive ? 6 : 0,
+                    lineStyle: {
+                        width: isActive ? 3 : 1.6,
+                        color: isActive ? fd.color : echarts.color.modifyAlpha(fd.color, 0.45)
+                    },
+                    itemStyle: { color: fd.color },
+                    areaStyle: isActive && item.key === factorKey ? {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: echarts.color.modifyAlpha(fd.color, 0.20) },
+                            { offset: 1, color: echarts.color.modifyAlpha(fd.color, 0.01) }
+                        ])
+                    } : undefined
+                };
+            }),
+            dataZoom: timeKey === '30days' ? [
+                {
+                    type: 'inside',
+                    start: 0,
+                    end: 100
+                }
+            ] : []
+        };
+    }
+
+    function renderMiniCharts() {
+        rainfallChart.setOption(miniAreaOption(factorData.rainfall.color, factorData.rainfall.days7, days7, 'mm', factorData.rainfall.threshold));
+        windChart.setOption(miniAreaOption(factorData.wind.color, factorData.wind.days7, days7, 'm/s', factorData.wind.threshold));
+        humidityChart.setOption(miniAreaOption(factorData.humidity.color, factorData.humidity.days7, days7, '%', factorData.humidity.threshold));
+        soilChart.setOption(miniAreaOption(factorData.soil.color, factorData.soil.days7, days7, '%', factorData.soil.threshold));
+        tempChart.setOption(miniAreaOption(factorData.temp.color, factorData.temp.days7, days7, '℃', factorData.temp.threshold));
+        pressureChart.setOption(miniAreaOption(factorData.pressure.color, factorData.pressure.days7, days7, 'hPa', factorData.pressure.threshold));
+    }
+
+    function renderComprehensive() {
+        comprehensiveChart.setOption(getComprehensiveOption(activeFactor, activeTime), true);
+        updateLinkageText();
+    }
+
+    function updateLinkageText() {
+        const texts = {
+            rainfall: {
+                today: '📊 联动分析：今日维度已按小时展开。当前降水过程在08时—18时明显增强，16时前后出现阶段性高值；叠加湿度持续偏高、土壤含水量逐步抬升，钦南区与沿海低洼地带洪涝风险显著增加。',
+                '7days': '📊 联动分析：近7天降水总体呈持续抬升趋势，06-08至06-10进入高位阶段，土壤蓄水背景已形成，需重点关注连续性降雨造成的城市积涝和次生灾害。',
+                '30days': '📊 联动分析：近30天降水波动上升明显，后段强降雨频次增加，与高湿环境叠加后致灾敏感性增强，区域风险总体处于抬升态势。'
+            },
+            wind: {
+                today: '📊 联动分析：今日风速在午后到傍晚增强，17时附近接近阈值。若与雷暴云团发展叠加，可能放大局部强对流、大风扰动及设施安全风险。',
+                '7days': '📊 联动分析：近7天风速整体维持中等偏高水平，末端持续上升，建议重点关注港区、海边及高空作业区域的瞬时风风险。',
+                '30days': '📊 联动分析：近30天风速变化较稳定但整体缓慢走高，极端天气背景下更容易形成阵风放大效应。'
+            },
+            humidity: {
+                today: '📊 联动分析：今日湿度全天维持较高区间，凌晨至上午最为明显。高湿环境会削弱蒸发能力，并与降水共同推动地表积水维持时间延长。',
+                '7days': '📊 联动分析：近7天湿度持续在高位波动，空气含湿充足，意味着一旦触发对流条件，短时强降雨转化效率较高。',
+                '30days': '📊 联动分析：近30天湿度整体高位稳定，是区域降雨易发、云系活跃的重要背景因子。'
+            },
+            soil: {
+                today: '📊 联动分析：今日土壤含水量呈持续爬升，傍晚后接近饱和阈值。对边坡、低洼地及排水能力不足区域，应提高积水和地质灾害警惕。',
+                '7days': '📊 联动分析：近7天土壤含水量由中值快速进入高值区间，前期降雨累积效应明显，说明下垫面调蓄能力正在减弱。',
+                '30days': '📊 联动分析：近30天土壤蓄湿背景不断增强，地表径流形成条件较前期更为充分，是洪涝风险上升的重要内部因素。'
+            },
+            temp: {
+                today: '📊 联动分析：今日气温呈典型日变化，午后升至高值后缓慢回落，整体仍处正常范围。当前其主要作用在于影响蒸发和近地层不稳定条件。',
+                '7days': '📊 联动分析：近7天气温整体平稳，对灾害的直接触发性较弱，但在高湿背景下会影响对流发展效率。',
+                '30days': '📊 联动分析：近30天气温维持季节性正常偏高水平，对致灾因子的贡献以背景调节为主。'
+            },
+            pressure: {
+                today: '📊 联动分析：今日气压呈先降后回升特征，午后低压段与降水增强阶段相对应，说明天气系统活动较为明显。',
+                '7days': '📊 联动分析：近7天气压持续偏低运行，系统性天气过程较活跃，有利于云团发展和局地强降水生成。',
+                '30days': '📊 联动分析：近30天气压低值阶段增多，与区域降雨活跃期具有较强同步性，可作为辅助研判指标。'
+            }
+        };
+
+        document.getElementById('linkageAnalysis').innerText = texts[activeFactor][activeTime];
+    }
+
+    // =========================
+    // 点击交互：保持原思路不变
+    // =========================
+    document.querySelectorAll('.chart-container.clickable').forEach(el => {
+        el.addEventListener('click', function () {
+            const factor = this.dataset.chart;
+            activeFactor = factor;
+
+            document.querySelectorAll('.chart-container.clickable').forEach(box => {
+                box.classList.remove('active');
+            });
+            this.classList.add('active');
+
+            renderComprehensive();
+        });
+    });
+
+    document.querySelectorAll('.time-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            activeTime = this.dataset.time;
+            renderComprehensive();
+        });
+    });
+
+    // =========================
+    // 初始渲染
+    // =========================
+    renderMiniCharts();
+    renderComprehensive();
+
+    // =========================
+    // 倒计时
+    // =========================
+    let countdown = 60;
+    setInterval(() => {
+        countdown--;
+        if (countdown <= 0) countdown = 60;
+        document.getElementById('refreshCountdown').innerText = countdown;
+    }, 1000);
+
+    // =========================
+    // 自适应
+    // =========================
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        rainfallChart.resize();
+        windChart.resize();
+        humidityChart.resize();
+        soilChart.resize();
+        tempChart.resize();
+        pressureChart.resize();
+        comprehensiveChart.resize();
+    });
+</script>
+</body>
+</html>

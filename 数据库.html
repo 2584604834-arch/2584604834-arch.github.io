@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>广西自然灾害智能检测数据库</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+        }
+
+        body {
+            background: #050d21;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(14, 110, 226, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 195, 255, 0.08) 0%, transparent 40%);
+            color: #e6f4ff;
+            padding: 30px 20px;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .page-title {
+            text-align: center;
+            font-size: 36px;
+            color: #42d4ff;
+            margin-bottom: 40px;
+            letter-spacing: 4px;
+            font-weight: 700;
+            text-shadow: 0 0 8px #00bfff, 0 0 16px #0088ff, 0 0 24px rgba(0, 136, 255, 0.5);
+            position: relative;
+        }
+
+        .page-title::after {
+            content: "";
+            display: block;
+            width: 400px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00bfff, transparent);
+            margin: 12px auto 0;
+            box-shadow: 0 0 6px #00bfff;
+        }
+
+        .search-wrap {
+            max-width: 1280px;
+            margin: 0 auto 35px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 25px 30px;
+            background: rgba(10, 26, 58, 0.75);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.2), inset 0 0 10px rgba(0, 191, 255, 0.1);
+            backdrop-filter: blur(8px);
+        }
+
+        .search-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .search-item label {
+            font-size: 14px;
+            color: #89cff0;
+            padding-left: 6px;
+            letter-spacing: 1px;
+        }
+
+        .search-item input {
+            width: 210px;
+            height: 46px;
+            padding: 0 15px;
+            background: rgba(0, 30, 70, 0.6);
+            border: 1px solid rgba(0, 191, 255, 0.4);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-item input:focus {
+            border-color: #00d0ff;
+            box-shadow: 0 0 10px rgba(0, 208, 255, 0.5);
+            background: rgba(0, 40, 85, 0.7);
+        }
+
+        .search-btn {
+            align-self: flex-end;
+            height: 46px;
+            padding: 0 30px;
+            background: linear-gradient(135deg, #0077dd, #00bfff);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 8px rgba(0, 170, 255, 0.4);
+            letter-spacing: 1px;
+        }
+
+        .search-btn:hover {
+            background: linear-gradient(135deg, #0088ee, #22d8ff);
+            box-shadow: 0 0 14px rgba(0, 200, 255, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .table-box {
+            max-width: 1440px;
+            margin: 0 auto;
+            background: rgba(8, 22, 48, 0.8);
+            border-radius: 14px;
+            border: 1px solid rgba(0, 191, 255, 0.35);
+            box-shadow: 0 0 20px rgba(0, 150, 255, 0.25), inset 0 0 15px rgba(0, 191, 255, 0.08);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .table-head {
+            width: 100%;
+        }
+
+        .table-head table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .table-head th {
+            padding: 16px 12px;
+            text-align: center;
+            font-size: 15px;
+            color: #b8e6ff;
+            background: linear-gradient(180deg, rgba(0, 100, 220, 0.6), rgba(0, 70, 180, 0.5));
+            border: 1px solid rgba(0, 191, 255, 0.25);
+            text-shadow: 0 0 4px rgba(0, 200, 255, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .table-scroll {
+            height: 540px;
+            overflow: hidden;
+        }
+
+        .table-scroll table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .table-scroll td {
+            padding: 13px 12px;
+            text-align: center;
+            font-size: 14px;
+            color: #d0e8ff;
+            border: 1px solid rgba(0, 191, 255, 0.18);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.25s ease;
+        }
+
+        .table-scroll tbody tr:hover td {
+            background: rgba(0, 120, 230, 0.25);
+            box-shadow: inset 0 0 8px rgba(0, 191, 255, 0.2);
+            color: #ffffff;
+        }
+
+        .scroll-inner {
+            animation: tableScroll 50s linear infinite;
+        }
+
+        .table-scroll:hover .scroll-inner {
+            animation-play-state: paused;
+        }
+
+        @keyframes tableScroll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+
+        .col1 { width: 12%; }
+        .col2 { width: 10%; }
+        .col3 { width: 12%; }
+        .col4 { width: 14%; }
+        .col5 { width: 20%; }
+        .col6 { width: 10%; }
+        .col7 { width: 10%; }
+        .col8 { width: 10%; }
+
+        @media (max-width: 900px) {
+            .page-title {
+                font-size: 28px;
+                letter-spacing: 2px;
+            }
+            .search-item input {
+                width: 170px;
+            }
+            th, td {
+                font-size: 13px;
+                padding: 10px 6px;
+            }
+            .table-scroll {
+                height: 420px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1 class="page-title">广西自然灾害智能检测数据库</h1>
+
+    <div class="search-wrap">
+        <div class="search-item">
+            <label>灾害编号/名称</label>
+            <input type="text" id="eventName" placeholder="编号/名称均可搜索">
+        </div>
+        <div class="search-item">
+            <label>灾害类型</label>
+            <input type="text" id="eventType" placeholder="洪涝/暴雨/低温/大风/降雨">
+        </div>
+        <div class="search-item">
+            <label>风险等级</label>
+            <input type="text" id="riskLevel" placeholder="一般/较大/重大/特别重大">
+        </div>
+        <div class="search-item">
+            <label>受灾城市</label>
+            <input type="text" id="eventArea" placeholder="如：南宁/柳州/桂林">
+        </div>
+        <div class="search-item">
+            <label>发生时间</label>
+            <input type="text" id="eventTime" placeholder="如：2014-04">
+        </div>
+        <button class="search-btn" id="searchBtn">智能查询</button>
+    </div>
+
+    <div class="table-box">
+        <div class="table-head">
+            <table>
+                <tr>
+                    <th class="col1">灾害名称(编号)</th>
+                    <th class="col2">灾害类型</th>
+                    <th class="col3">风险等级</th>
+                    <th class="col4">灾害时段</th>
+                    <th class="col5">受灾城市</th>
+                    <th class="col6">经济损失(万元)</th>
+                    <th class="col7">受灾人口</th>
+                    <th class="col8">伤亡人数</th>
+                </tr>
+            </table>
+        </div>
+
+        <div class="table-scroll">
+            <div class="scroll-inner" id="scrollInner">
+                <table>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 已彻底去重！无任何重复数据！
+        const originData = [
+            {eventName:"HL2014000005",eventType:"洪涝",riskLevel:3,startTime:"2014-04-23",endTime:"2014-04-26",area:"来宾市兴宾区、柳州市柳江县、贺州市昭平县",loss:500,affectedPeople:77000,casualty:3},
+            {eventName:"HL2014000030",eventType:"洪涝",riskLevel:1,startTime:"2014-06-29",endTime:"2014-06-30",area:"百色、河池2市4个县",loss:300,affectedPeople:11000,casualty:1},
+            {eventName:"BY2014000001",eventType:"暴雨",riskLevel:8,startTime:"2014-08-11",endTime:"2014-08-14",area:"南宁、贵港、百色",loss:900,affectedPeople:36000,casualty:10},
+            {eventName:"DW2016000001",eventType:"低温",riskLevel:17,startTime:"2016-01-20",endTime:"2016-01-24",area:"南宁、桂林、贵港等4市6个县",loss:2600,affectedPeople:72000,casualty:0},
+            {eventName:"JY2016000002",eventType:"降雨",riskLevel:3,startTime:"2016-01-26",endTime:"2016-01-29",area:"梧州市岑溪市",loss:2500,affectedPeople:25000,casualty:4},
+            {eventName:"DF2016000008",eventType:"大风",riskLevel:3,startTime:"2016-04-10",endTime:"2016-04-12",area:"柳州、桂林、百色等5市12个县",loss:6500,affectedPeople:108000,casualty:0},
+            {eventName:"JY2016000003",eventType:"降雨",riskLevel:6,startTime:"2016-04-20",endTime:"2016-04-23",area:"南宁、柳州、桂林等5市7个县",loss:3300,affectedPeople:13000,casualty:2},
+            {eventName:"DF2016000009",eventType:"大风",riskLevel:1,startTime:"2016-04-24",endTime:"2016-04-25",area:"百色市靖西市、那坡县",loss:1100,affectedPeople:30000,casualty:0},
+            {eventName:"JY2016000005",eventType:"降雨",riskLevel:5,startTime:"2016-05-19",endTime:"2016-05-21",area:"南宁、桂林、梧州",loss:47000,affectedPeople:291000,casualty:3},
+            {eventName:"JY2016000008",eventType:"降雨",riskLevel:2,startTime:"2016-05-27",endTime:"2016-05-29",area:"柳州、玉林、河池3市5个县",loss:900,affectedPeople:49000,casualty:1},
+            {eventName:"DF2016000025",eventType:"大风",riskLevel:2,startTime:"2016-06-03",endTime:"2016-06-05",area:"南宁、柳州、桂林等5市12个县",loss:2800,affectedPeople:28000,casualty:3},
+            {eventName:"JY2016000011",eventType:"降雨",riskLevel:5,startTime:"2016-06-13",endTime:"2016-06-14",area:"南宁、柳州、桂林等8市31个县",loss:15000,affectedPeople:199000,casualty:1},
+            {eventName:"HL2017000005",eventType:"洪涝",riskLevel:6,startTime:"2017-04-18",endTime:"2017-04-21",area:"马山县、环江毛南族自治县",loss:200,affectedPeople:1100,casualty:0},
+            {eventName:"HL2017000017",eventType:"洪涝",riskLevel:5,startTime:"2017-05-10",endTime:"2017-05-13",area:"南宁市武鸣区、桂林市兴安县",loss:100,affectedPeople:700,casualty:1},
+            {eventName:"HL2017000028",eventType:"洪涝",riskLevel:4,startTime:"2017-06-03",endTime:"2017-06-07",area:"百色、贺州、河池3市7个县",loss:900,affectedPeople:23000,casualty:0},
+            {eventName:"HL2017000030",eventType:"洪涝",riskLevel:1,startTime:"2017-06-06",endTime:"2017-06-08",area:"柳州、钦州、百色等5市11个县",loss:3100,affectedPeople:43000,casualty:1},
+            {eventName:"HL2017000039",eventType:"洪涝",riskLevel:1,startTime:"2017-06-16",endTime:"2017-06-16",area:"南宁、桂林、百色等6市15个县",loss:5000,affectedPeople:57000,casualty:1},
+            {eventName:"JY2017000017",eventType:"降雨",riskLevel:1,startTime:"2017-08-12",endTime:"2017-08-16",area:"南宁、柳州、桂林等5市23个县",loss:47000,affectedPeople:160000,casualty:9},
+            {eventName:"JY2019000002",eventType:"降雨",riskLevel:5,startTime:"2019-06-06",endTime:"2019-06-10",area:"河池、桂林、柳州等5市18个县",loss:19000,affectedPeople:99000,casualty:5},
+            {eventName:"JY2019000003",eventType:"降雨",riskLevel:6,startTime:"2019-06-06",endTime:"2019-06-11",area:"桂林、河池、柳州等6市32个县",loss:63000,affectedPeople:366000,casualty:10},
+            {eventName:"JY2019000005",eventType:"降雨",riskLevel:1,startTime:"2019-06-15",endTime:"2019-06-18",area:"百色、钦州、防城港3市10个县",loss:5500,affectedPeople:12000,casualty:7},
+            {eventName:"HL2019000029",eventType:"洪涝",riskLevel:6,startTime:"2019-07-03",endTime:"2019-07-08",area:"柳州、河池2市14个县",loss:800,affectedPeople:10000,casualty:0},
+            {eventName:"HL2019000030",eventType:"洪涝",riskLevel:4,startTime:"2019-07-06",endTime:"2019-07-10",area:"桂林、河池、柳州等8市43个县",loss:62000,affectedPeople:300000,casualty:0},
+            {eventName:"JY2019000009",eventType:"降雨",riskLevel:6,startTime:"2019-07-12",endTime:"2019-07-16",area:"桂林、河池、柳州等4市25个县",loss:65000,affectedPeople:362000,casualty:0}
+        ];
+
+        // 自动去重代码（确保永远不会重复）
+        const uniqueData = Array.from(new Map(originData.map(item => [item.eventName, item])).values());
+
+        function getRiskText(level) {
+            if (level === 1) return "特别重大";
+            if (level === 2) return "重大";
+            if (level >= 3 && level <= 6) return "较大";
+            return "一般";
+        }
+
+        function getEventFullName(code){
+            const prefix = code.substring(0,2);
+            const nameMap = {"HL":"洪涝","BY":"暴雨","DW":"低温","DF":"大风","JY":"降雨"};
+            return nameMap[prefix] || "未知灾害";
+        }
+
+        const tableBody = document.getElementById('tableBody');
+        const eventNameInput = document.getElementById('eventName');
+        const eventTypeInput = document.getElementById('eventType');
+        const riskLevelInput = document.getElementById('riskLevel');
+        const eventAreaInput = document.getElementById('eventArea');
+        const eventTimeInput = document.getElementById('eventTime');
+        const searchBtn = document.getElementById('searchBtn');
+
+        function renderTable(data) {
+            let html = '';
+            data.forEach(item => {
+                const riskText = getRiskText(item.riskLevel);
+                html += `
+                    <tr>
+                        <td class="col1">${item.eventName}</td>
+                        <td class="col2">${item.eventType}</td>
+                        <td class="col3">${riskText}</td>
+                        <td class="col4">${item.startTime} ~ ${item.endTime}</td>
+                        <td class="col5">${item.area}</td>
+                        <td class="col6">${item.loss}</td>
+                        <td class="col7">${item.affectedPeople}</td>
+                        <td class="col8">${item.casualty}</td>
+                    </tr>
+                `;
+            });
+            tableBody.innerHTML = html;
+        }
+
+        renderTable(uniqueData);
+
+        function filterData() {
+            const nameKey = eventNameInput.value.trim().toLowerCase();
+            const typeKey = eventTypeInput.value.trim().toLowerCase();
+            const levelKey = riskLevelInput.value.trim();
+            const areaKey = eventAreaInput.value.trim().toLowerCase();
+            const timeKey = eventTimeInput.value.trim().toLowerCase();
+
+            const result = uniqueData.filter(item => {
+                const riskText = getRiskText(item.riskLevel);
+                const eventFullName = getEventFullName(item.eventName);
+                const nameMatch = nameKey ? (item.eventName.toLowerCase().includes(nameKey) || eventFullName.includes(nameKey)) : true;
+                const typeMatch = typeKey ? item.eventType.toLowerCase().includes(typeKey) : true;
+                const levelMatch = levelKey ? riskText.includes(levelKey) : true;
+                const areaMatch = areaKey ? item.area.toLowerCase().includes(areaKey) : true;
+                const timeMatch = timeKey ? (item.startTime.includes(timeKey) || item.endTime.includes(timeKey)) : true;
+                return nameMatch && typeMatch && levelMatch && areaMatch && timeMatch;
+            });
+            renderTable(result);
+        }
+
+        searchBtn.addEventListener('click', filterData);
+        document.addEventListener('keydown', e => { if(e.key === 'Enter') filterData(); });
+    </script>
+</body>
+</html>
