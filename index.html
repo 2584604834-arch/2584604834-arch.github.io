@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>灾擎 - 自然灾害综合指挥系统</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<style>
+:root{--bg:#0a0e1a;--panel:rgba(12,20,40,0.92);--border:rgba(6,182,212,0.35);--cyan:#06B6D4;--cyan2:#22D3EE;--blue:#3B82F6;--text:#E6F4FF;--sub:#7BA4C0;--red:#EF4444;--orange:#F59E0B;--green:#10B981}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+body{background:radial-gradient(circle at 10% 20%,rgba(6,182,212,0.08),transparent 30%),radial-gradient(circle at 90% 80%,rgba(59,130,246,0.06),transparent 30%),linear-gradient(180deg,#080c18,#0a0e1a 50%,#0c1020)}
+
+/* Navigation */
+.nav{position:fixed;top:0;left:0;right:0;height:60px;background:linear-gradient(90deg,rgba(12,20,40,0.98),rgba(10,14,26,0.95));border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;z-index:1000;box-shadow:0 2px 20px rgba(0,0,0,0.3)}
+.nav::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan2),transparent)}
+.nav-brand{font-size:20px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,var(--cyan2),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:30px}
+.nav-tabs{display:flex;gap:8px;flex:1;overflow-x:auto}
+.nav-tab{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;transition:all 0.3s;white-space:nowrap;border:1px solid transparent}
+.nav-tab:hover{background:rgba(6,182,212,0.1);color:var(--text)}
+.nav-tab.active{background:rgba(6,182,212,0.15);border-color:var(--border);color:var(--cyan2)}
+.nav-clock{font-size:12px;color:var(--sub);margin-left:20px;white-space:nowrap}
+
+/* Module Container */
+.module-container{position:fixed;top:60px;left:0;right:0;bottom:0;overflow:hidden}
+.module{visibility:hidden;opacity:0;pointer-events:none;width:100%;height:100%;overflow:auto;position:absolute;top:0;left:0}
+.module.active{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+
+/* Common Panel Styles */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;overflow:hidden;position:relative}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.panel-title{font-size:14px;font-weight:700;color:var(--cyan2);margin-bottom:12px;padding-left:10px;border-left:3px solid var(--cyan);letter-spacing:1px}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:rgba(6,182,212,0.2);border-radius:999px}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<div class="nav">
+  <div class="nav-brand">灾擎</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-module="dashboard">综合指挥大屏</div>
+    <div class="nav-tab" data-module="ai">智能分析决策</div>
+    <div class="nav-tab" data-module="risk">风险可视化</div>
+    <div class="nav-tab" data-module="push">预警推送平台</div>
+    <div class="nav-tab" data-module="warning">分级预警中心</div>
+    <div class="nav-tab" data-module="access">多源感知接入</div>
+    <div class="nav-tab" data-module="database">灾情数据库</div>
+    <div class="nav-tab" data-module="factor">致灾因子分析</div>
+  </div>
+  <div class="nav-clock" id="navClock">--</div>
+</div>
+
+<!-- Module Container -->
+<div class="module-container">
+
+  <!-- Module 1: Dashboard -->
+  <div class="module active" id="module-dashboard"></div>
+
+  <!-- Module 2: AI Analysis -->
+  <div class="module" id="module-ai"></div>
+
+  <!-- Module 3: Risk Visualization -->
+  <div class="module" id="module-risk"></div>
+
+  <!-- Module 4: Push Platform -->
+  <div class="module" id="module-push"></div>
+
+  <!-- Module 5: Warning Center -->
+  <div class="module" id="module-warning"></div>
+
+  <!-- Module 6: Multi-source Access -->
+  <div class="module" id="module-access"></div>
+
+  <!-- Module 7: Database -->
+  <div class="module" id="module-database"></div>
+
+  <!-- Module 8: Disaster Factor -->
+  <div class="module" id="module-factor"></div>
+
+</div>
+
+<script>
+// Navigation
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.module').forEach(m => m.classList.remove('active'));
+    this.classList.add('active');
+    var activeModule = document.getElementById('module-' + this.dataset.module);
+    activeModule.classList.add('active');
+    // Trigger resize in iframes so fixed-size pages can re-scale
+    setTimeout(function(){
+      var iframes = activeModule.querySelectorAll('iframe');
+      for(var i=0;i<iframes.length;i++){
+        try{ iframes[i].contentWindow.dispatchEvent(new Event('resize')); }catch(e){}
+      }
+      window.dispatchEvent(new Event('resize'));
+    },100);
+  });
+});
+
+// Clock
+function updateClock(){
+  var n=new Date(),p=function(x){return String(x).padStart(2,'0')};
+  document.getElementById('navClock').textContent=n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+' '+p(n.getHours())+':'+p(n.getMinutes())+':'+p(n.getSeconds());
+}
+updateClock();
+setInterval(updateClock,1000);
+</script>
+
+<!-- Module Scripts -->
+<script>
+// Load all modules inline
+(function(){
+
+// ==================== MODULE 1: DASHBOARD ====================
+document.getElementById('module-dashboard').innerHTML = `
+<div style="display:grid;grid-template-columns:320px 1fr 320px;grid-template-rows:auto 1fr auto auto;gap:12px;padding:12px;height:100%;width:100%">
+  <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,rgba(12,20,40,0.95),rgba(10,14,26,0.88));border:1px solid var(--border);border-radius:12px;padding:14px 28px;position:relative;overflow:hidden">
+    <div style="position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan2),transparent)"></div>
+    <h1 style="font-size:28px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,var(--cyan2),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent">灾擎 · 自然灾害综合指挥大屏</h1>
+    <div style="display:flex;gap:24px;font-size:13px;color:var(--sub)">
+      <span><i style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block"></i> 系统运行正常</span>
+      <span>广西 · 多云 28°C</span>
+      <span>数据更新: 实时</span>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;grid-row:2/4">
+    <div class="panel">
+      <div class="panel-title">灾情数据库概览</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">总记录数</div>
+          <div style="font-size:22px;font-weight:800;color:var(--cyan2)">12,847</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">今日新增</div>
+          <div style="font-size:22px;font-weight:800;color:var(--red)">+23</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">活跃灾害</div>
+          <div style="font-size:22px;font-weight:800;color:var(--orange)">18</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.15);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">已处置</div>
+          <div style="font-size:22px;font-weight:800;color:var(--green)">156</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">多源感知接入</div>
+      <ul style="list-style:none">
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(6,182,212,0.08);font-size:12px">
+          <span style="color:var(--sub)">📡 气象监测站</span>
+          <span style="font-weight:700;color:var(--cyan2)">1,256 台</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">在线</span>
+        </li>
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(6,182,212,0.08);font-size:12px">
+          <span style="color:var(--sub)">🌊 水文传感器</span>
+          <span style="font-weight:700;color:var(--cyan2)">843 台</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">在线</span>
+        </li>
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(6,182,212,0.08);font-size:12px">
+          <span style="color:var(--sub)">📐 地质位移计</span>
+          <span style="font-weight:700;color:var(--cyan2)">567 台</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">在线</span>
+        </li>
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(6,182,212,0.08);font-size:12px">
+          <span style="color:var(--sub)">🔥 林火热点</span>
+          <span style="font-weight:700;color:var(--cyan2)">312 个</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,0.15);color:var(--orange)">预警</span>
+        </li>
+        <li style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;font-size:12px">
+          <span style="color:var(--sub)">📹 视频监控</span>
+          <span style="font-weight:700;color:var(--cyan2)">2,089 路</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">在线</span>
+        </li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-title">灾害类型分布</div>
+      <div id="disasterTypeChart" style="width:100%;height:180px"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;grid-row:2/3">
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">监测区域</div>
+        <div style="font-size:26px;font-weight:800;color:var(--cyan2)">35<span style="font-size:11px;color:var(--sub);margin-left:2px">个</span></div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">覆盖面积</div>
+        <div style="font-size:26px;font-weight:800;color:var(--cyan2)">2,560<span style="font-size:11px;color:var(--sub);margin-left:2px">km²</span></div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">预警事件(今日)</div>
+        <div style="font-size:26px;font-weight:800;color:var(--red)">23<span style="font-size:11px;color:var(--sub);margin-left:2px">起</span></div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">处置中</div>
+        <div style="font-size:26px;font-weight:800;color:var(--orange)">18<span style="font-size:11px;color:var(--sub);margin-left:2px">起</span></div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">已完成</div>
+        <div style="font-size:26px;font-weight:800;color:var(--green)">156<span style="font-size:11px;color:var(--sub);margin-left:2px">起</span></div>
+      </div>
+      <div class="panel" style="text-align:center">
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">AI分析准确率</div>
+        <div style="font-size:26px;font-weight:800;color:var(--cyan2)">92<span style="font-size:11px;color:var(--sub);margin-left:2px">%</span></div>
+      </div>
+    </div>
+    <div style="flex:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;position:relative;overflow:hidden">
+      <canvas id="gxMap" style="width:100%;height:100%"></canvas>
+    </div>
+  </div>
+
+  <div style="grid-column:2/3;grid-row:3/4">
+    <div class="panel">
+      <div class="panel-title">视频融合 · 实时监控（点击打开）</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px">
+        <a href="https://www.windy.com/zh/-Satellite-satellite?satellite,22.5,108.5,7" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none;transition:all 0.3s">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">🛰️</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">FY-4A 卫星云图</span>
+        </a>
+        <a href="https://www.windy.com/zh/-Radar-radar?radar,22.5,108.5,7" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">📡</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">广西气象雷达</span>
+        </a>
+        <a href="https://www.windy.com/zh/-Temperature-temperature?temperature,22.5,108.5,7" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">🌡️</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">广西温度分布</span>
+        </a>
+        <a href="https://www.windy.com/zh/-Lightning-lightning?lightning,22.5,108.5,7" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">⚡</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">闪电定位监测</span>
+        </a>
+        <a href="https://earth.nullschool.net/#current/wind/surface/level/overlay=temp/orthographic=108.5,22.5,1200" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">🌐</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">全球风场实况</span>
+        </a>
+        <a href="https://www.windy.com/zh/-Rain-accumulation-rainAccu?rainAccu,22.5,108.5,7" target="_blank" style="background:rgba(6,182,212,0.04);border:1px solid rgba(6,182,212,0.15);border-radius:8px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;font-size:11px;color:var(--sub);position:relative;overflow:hidden;cursor:pointer;text-decoration:none">
+          <span style="position:absolute;top:6px;left:6px;padding:2px 8px;background:rgba(239,68,68,0.9);color:#fff;font-size:9px;font-weight:700;border-radius:4px">● LIVE</span>
+          <span style="font-size:28px">🌧️</span>
+          <span style="font-size:10px;color:var(--text);font-weight:600">降雨量累积预报</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;grid-row:2/4">
+    <div class="panel">
+      <div class="panel-title">AI 预警中心</div>
+      <div id="alertRingChart" style="width:100%;height:160px"></div>
+      <ul style="list-style:none">
+        <li style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--red)"></span>
+          <span>人员聚集</span>
+          <span style="margin-left:auto;font-weight:700;color:var(--cyan2)">8 起</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--red)"></span>
+          <span>区域入侵</span>
+          <span style="margin-left:auto;font-weight:700;color:var(--cyan2)">6 起</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span>
+          <span>异常徘徊</span>
+          <span style="margin-left:auto;font-weight:700;color:var(--cyan2)">4 起</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--orange)"></span>
+          <span>烟火识别</span>
+          <span style="margin-left:auto;font-weight:700;color:var(--cyan2)">3 起</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:7px 0;font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--cyan)"></span>
+          <span>车辆异常</span>
+          <span style="margin-left:auto;font-weight:700;color:var(--cyan2)">2 起</span>
+        </li>
+      </ul>
+    </div>
+    <div class="panel">
+      <div class="panel-title">数据中台</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.12);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">数据汇聚</div>
+          <div style="font-size:18px;font-weight:800;color:var(--cyan2)">1.26 TB</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.12);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">治理率</div>
+          <div style="font-size:18px;font-weight:800;color:var(--green)">92%</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.12);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">结构化数据</div>
+          <div style="font-size:18px;font-weight:800;color:var(--cyan2)">68.5 亿条</div>
+        </div>
+        <div style="background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.12);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;color:var(--sub);margin-bottom:4px">设备接入</div>
+          <div style="font-size:18px;font-weight:800;color:var(--cyan2)">1,256 台</div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">警情联动</div>
+      <ul style="list-style:none">
+        <li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:11px">
+          <span style="color:var(--sub);white-space:nowrap;min-width:56px">10:28:15</span>
+          <span>可疑人员聚集</span>
+          <span style="margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">已联动</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:11px">
+          <span style="color:var(--sub);white-space:nowrap;min-width:56px">10:24:33</span>
+          <span>区域入侵</span>
+          <span style="margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">已联动</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:11px">
+          <span style="color:var(--sub);white-space:nowrap;min-width:56px">10:18:07</span>
+          <span>车辆异常</span>
+          <span style="margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;background:rgba(245,158,11,0.15);color:var(--orange)">处理中</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(6,182,212,0.06);font-size:11px">
+          <span style="color:var(--sub);white-space:nowrap;min-width:56px">10:12:44</span>
+          <span>烟火识别</span>
+          <span style="margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">已联动</span>
+        </li>
+        <li style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:11px">
+          <span style="color:var(--sub);white-space:nowrap;min-width:56px">10:05:21</span>
+          <span>异常徘徊</span>
+          <span style="margin-left:auto;font-size:10px;padding:1px 8px;border-radius:999px;background:rgba(16,185,129,0.15);color:var(--green)">已联动</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="grid-column:1/-1;grid-row:4/5">
+    <div class="panel">
+      <div class="panel-title">技术架构</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">前端感知</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">🏔️ 🔥</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">通信传输</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">5G 📶 专网 IoT</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">平台支撑</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">☁️ API 🖥️</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">数据资源</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">🗄️ 📊 💾</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">AI智能</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">🧠 📈 🤖</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">业务应用</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">📋 🚨 🗂️</div>
+        </div>
+        <span style="color:var(--cyan);font-size:18px;opacity:0.6">→</span>
+        <div style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+          <div style="font-size:12px;font-weight:700;color:var(--cyan2);margin-bottom:6px">指挥决策</div>
+          <div style="display:flex;gap:6px;justify-content:center;font-size:16px">🎯 📡 ✅</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
+// Dashboard Charts
+setTimeout(function(){
+  var typeChart=echarts.init(document.getElementById('disasterTypeChart'));
+  typeChart.setOption({tooltip:{trigger:'item'},series:[{type:'pie',radius:['40%','70%'],center:['50%','50%'],avoidLabelOverlap:true,label:{show:false},data:[
+    {value:3842,name:'洪涝',itemStyle:{color:'#3B82F6'}},{value:2956,name:'山体滑坡',itemStyle:{color:'#F59E0B'}},
+    {value:2134,name:'台风',itemStyle:{color:'#06B6D4'}},{value:1876,name:'干旱',itemStyle:{color:'#EF4444'}},
+    {value:1245,name:'地震',itemStyle:{color:'#8B5CF6'}},{value:794,name:'其他',itemStyle:{color:'#10B981'}}
+  ]}]});
+
+  var ringChart=echarts.init(document.getElementById('alertRingChart'));
+  ringChart.setOption({tooltip:{trigger:'item'},title:{text:'23\n预警总数',left:'center',top:'center',textStyle:{color:'#E6F4FF',fontSize:14,fontWeight:700}},
+  series:[{type:'pie',radius:['55%','75%'],center:['50%','50%'],label:{show:false},data:[
+    {value:8,name:'人员聚集',itemStyle:{color:'#EF4444'}},{value:6,name:'区域入侵',itemStyle:{color:'#F59E0B'}},
+    {value:4,name:'异常徘徊',itemStyle:{color:'#06B6D4'}},{value:3,name:'烟火识别',itemStyle:{color:'#8B5CF6'}},
+    {value:2,name:'车辆异常',itemStyle:{color:'#10B981'}}
+  ]}]});
+
+  // Map
+  var cityData=[
+    {name:'南宁',x:0.52,y:0.72,risk:8,level:'red'},{name:'柳州',x:0.55,y:0.42,risk:7,level:'orange'},
+    {name:'桂林',x:0.62,y:0.22,risk:6,level:'orange'},{name:'梧州',x:0.78,y:0.55,risk:5,level:'yellow'},
+    {name:'北海',x:0.50,y:0.92,risk:4,level:'yellow'},{name:'防城港',x:0.42,y:0.88,risk:3,level:'cyan'},
+    {name:'钦州',x:0.46,y:0.85,risk:5,level:'yellow'},{name:'贵港',x:0.58,y:0.62,risk:6,level:'orange'},
+    {name:'玉林',x:0.68,y:0.72,risk:7,level:'orange'},{name:'百色',x:0.22,y:0.48,risk:8,level:'red'},
+    {name:'贺州',x:0.82,y:0.38,risk:3,level:'cyan'},{name:'河池',x:0.42,y:0.32,risk:5,level:'yellow'},
+    {name:'来宾',x:0.55,y:0.52,risk:4,level:'yellow'},{name:'崇左',x:0.35,y:0.72,risk:6,level:'orange'}
+  ];
+  var levelColors={red:'#EF4444',orange:'#F59E0B',yellow:'#22D3EE',cyan:'#06B6D4'};
+  var gxOutline=[[0.12,0.38],[0.18,0.32],[0.25,0.28],[0.32,0.25],[0.40,0.22],[0.48,0.20],[0.55,0.18],[0.62,0.20],[0.68,0.22],[0.75,0.25],[0.82,0.28],[0.88,0.32],[0.92,0.38],[0.95,0.45],[0.96,0.52],[0.94,0.60],[0.90,0.68],[0.85,0.75],[0.78,0.82],[0.70,0.88],[0.62,0.92],[0.55,0.95],[0.48,0.96],[0.40,0.94],[0.32,0.90],[0.25,0.85],[0.18,0.78],[0.14,0.70],[0.10,0.62],[0.08,0.52],[0.10,0.45],[0.12,0.38]];
+
+  var mapCanvas=document.getElementById('gxMap');
+  var container=mapCanvas.parentElement;
+  var mapW=container.clientWidth,mapH=container.clientHeight;
+  mapCanvas.width=mapW*2;mapCanvas.height=mapH*2;
+  mapCanvas.style.width=mapW+'px';mapCanvas.style.height=mapH+'px';
+  var mapCtx=mapCanvas.getContext('2d');
+  mapCtx.scale(2,2);
+
+  mapCtx.clearRect(0,0,mapW,mapH);
+  mapCtx.strokeStyle='rgba(6,182,212,0.06)';mapCtx.lineWidth=0.5;
+  for(var i=0;i<mapW;i+=40){mapCtx.beginPath();mapCtx.moveTo(i,0);mapCtx.lineTo(i,mapH);mapCtx.stroke()}
+  for(var j=0;j<mapH;j+=40){mapCtx.beginPath();mapCtx.moveTo(0,j);mapCtx.lineTo(mapW,j);mapCtx.stroke()}
+  mapCtx.beginPath();
+  for(var k=0;k<gxOutline.length;k++){var p=gxOutline[k];var px=p[0]*mapW,py=p[1]*mapH;if(k===0)mapCtx.moveTo(px,py);else mapCtx.lineTo(px,py)}
+  mapCtx.closePath();
+  mapCtx.fillStyle='rgba(6,182,212,0.08)';mapCtx.fill();
+  mapCtx.strokeStyle='rgba(6,182,212,0.4)';mapCtx.lineWidth=1.5;mapCtx.stroke();
+  for(var m=0;m<cityData.length;m++){
+    var c=cityData[m];var cx=c.x*mapW,cy=c.y*mapH;
+    var grad=mapCtx.createRadialGradient(cx,cy,0,cx,cy,c.risk*8);
+    grad.addColorStop(0,levelColors[c.level]+'60');grad.addColorStop(1,'transparent');
+    mapCtx.fillStyle=grad;mapCtx.beginPath();mapCtx.arc(cx,cy,c.risk*8,0,Math.PI*2);mapCtx.fill();
+  }
+  for(var n=0;n<cityData.length;n++){
+    var c2=cityData[n];var cx2=c2.x*mapW,cy2=c2.y*mapH;
+    if(c2.level==='red'||c2.level==='orange'){
+      mapCtx.strokeStyle=levelColors[c2.level]+'40';mapCtx.lineWidth=1;
+      mapCtx.beginPath();mapCtx.arc(cx2,cy2,c2.risk*3+8,0,Math.PI*2);mapCtx.stroke();
+    }
+    mapCtx.fillStyle=levelColors[c2.level];mapCtx.beginPath();mapCtx.arc(cx2,cy2,c2.level==='red'?6:c2.level==='orange'?5:4,0,Math.PI*2);mapCtx.fill();
+    mapCtx.shadowColor=levelColors[c2.level];mapCtx.shadowBlur=8;
+    mapCtx.beginPath();mapCtx.arc(cx2,cy2,3,0,Math.PI*2);mapCtx.fill();
+    mapCtx.shadowBlur=0;
+    mapCtx.fillStyle='rgba(230,244,255,0.7)';mapCtx.font='11px Microsoft YaHei';
+    mapCtx.fillText(c2.name,cx2+10,cy2+4);
+  }
+  mapCtx.fillStyle='rgba(6,182,212,0.6)';mapCtx.font='bold 14px Microsoft YaHei';
+  mapCtx.fillText('广西全域灾害态势地图',16,24);
+
+  window.addEventListener('resize',function(){typeChart.resize();ringChart.resize()});
+},100);
+
+})();
+</script>
+
+<!-- Remaining modules will be loaded via iframe for full functionality -->
+<script>
+// Load other modules as complete standalone pages
+var modules = [
+  {id: 'module-ai', src: 'group3_ai_analysis_guangxi.html'},
+  {id: 'module-risk', src: 'guangxi_final_polish_tabs.html'},
+  {id: 'module-push', src: 'tuisong.html'},
+  {id: 'module-warning', src: 'yujing111.html'},
+  {id: 'module-access', src: 'zaiqing_guangxi_access_advanced.html'},
+  {id: 'module-database', src: '数据库.html'},
+  {id: 'module-factor', src: '致灾因子.html'}
+];
+
+modules.forEach(function(m){
+  var container = document.getElementById(m.id);
+  var iframe = document.createElement('iframe');
+  iframe.src = m.src;
+  iframe.style.cssText = 'width:100%;height:100%;border:none;';
+  iframe.setAttribute('frameborder', '0');
+  container.appendChild(iframe);
+});
+</script>
+
+</body>
+</html>
